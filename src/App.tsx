@@ -178,6 +178,8 @@ function App() {
             onOpenFile={state.openDoc}
             onOpenSearch={() => state.setSearchDialogOpen(true)}
             onReconnect={state.reconnectFolderSource}
+            onRenameFile={state.renameDoc}
+            onDeleteFile={state.deleteDoc}
           />
         )}
 

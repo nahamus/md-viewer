@@ -1,7 +1,34 @@
-import ReactMarkdown from "react-markdown";
+import { isValidElement } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { modKeyLabel } from "../lib/platform";
 import type { DocMode, DocUiState, OpenDoc } from "../types";
+import { Mermaid } from "./Mermaid";
+
+function isMermaidCodeElement(node: unknown): boolean {
+  if (!isValidElement(node)) return false;
+  const className = (node.props as { className?: string }).className;
+  return typeof className === "string" && className.includes("language-mermaid");
+}
+
+const markdownComponents: Components = {
+  code({ className, children }) {
+    const language = /language-(\w+)/.exec(className ?? "")?.[1];
+    if (language === "mermaid") {
+      const chart = String(children).replace(/\n$/, "");
+      return <Mermaid key={chart} chart={chart} />;
+    }
+    return <code className={className}>{children}</code>;
+  },
+  pre({ children }) {
+    // Fenced ```mermaid blocks come in as <pre><code class="language-mermaid">.
+    // The Mermaid component (rendered by the `code` override above) already
+    // draws its own container, so skip the <pre> wrapper for it — otherwise
+    // the diagram ends up boxed inside the code-block styling.
+    if (isMermaidCodeElement(children)) return <>{children}</>;
+    return <pre>{children}</pre>;
+  },
+};
 
 interface Props {
   doc: OpenDoc;
@@ -29,35 +56,53 @@ export function DocumentPane({ doc, content, ui, onSetMode, onDraftChange, onSav
             <>
               <button
                 type="button"
-                className="primary-btn"
+                className={`icon-action-btn ${dirty ? "icon-action-btn--active" : ""}`}
                 onClick={onSave}
                 disabled={!dirty || ui.saving}
                 title={`Save (${modKeyLabel}+S)`}
+                aria-label="Save"
               >
-                {ui.saving ? "Saving…" : "Save"}
+                {ui.saving ? "⏳" : "💾"}
               </button>
-              <button type="button" onClick={onCancel} disabled={ui.saving} title="Cancel (Esc)">
-                Cancel
+              <button
+                type="button"
+                className="icon-action-btn"
+                onClick={onCancel}
+                disabled={ui.saving}
+                title="Cancel (Esc)"
+                aria-label="Cancel"
+              >
+                ✕
               </button>
             </>
           ) : (
             <>
               <button
                 type="button"
-                className={ui.mode === "view" ? "toggle-btn toggle-btn--active" : "toggle-btn"}
+                className={`icon-action-btn ${ui.mode === "view" ? "icon-action-btn--active" : ""}`}
                 onClick={() => onSetMode("view")}
+                title="Rendered view"
+                aria-label="Rendered view"
               >
-                View
+                👁
               </button>
               <button
                 type="button"
-                className={ui.mode === "raw" ? "toggle-btn toggle-btn--active" : "toggle-btn"}
+                className={`icon-action-btn icon-action-btn--mono ${ui.mode === "raw" ? "icon-action-btn--active" : ""}`}
                 onClick={() => onSetMode("raw")}
+                title="Raw source"
+                aria-label="Raw source"
               >
-                Raw
+                {"</>"}
               </button>
-              <button type="button" onClick={() => onSetMode("edit")}>
-                Edit
+              <button
+                type="button"
+                className="icon-action-btn"
+                onClick={() => onSetMode("edit")}
+                title="Edit"
+                aria-label="Edit"
+              >
+                ✎
               </button>
             </>
           )}
@@ -68,7 +113,9 @@ export function DocumentPane({ doc, content, ui, onSetMode, onDraftChange, onSav
         {ui.error && <p className="form-error">{ui.error}</p>}
         {ui.mode === "view" && (
           <div className="markdown-body">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {content}
+            </ReactMarkdown>
           </div>
         )}
         {ui.mode === "raw" && <pre className="raw-view">{content}</pre>}

@@ -17,6 +17,24 @@ function toViewMode(ui: DocUiState, content: string): DocUiState {
   return { ...ui, mode: "view", draft: content };
 }
 
+/** Which tab should become active after removing the one at `key` (if it was active). */
+function nextActiveKeyAfterRemoving(
+  key: string,
+  pinnedTabs: OpenDoc[],
+  previewTab: OpenDoc | null,
+  activeKey: string | null,
+): string | null {
+  if (activeKey !== key) return activeKey;
+  const pinnedIdx = pinnedTabs.findIndex((t) => t.key === key);
+  if (pinnedIdx !== -1) {
+    return pinnedTabs[pinnedIdx + 1]?.key ?? pinnedTabs[pinnedIdx - 1]?.key ?? previewTab?.key ?? null;
+  }
+  if (previewTab?.key === key) {
+    return pinnedTabs[pinnedTabs.length - 1]?.key ?? null;
+  }
+  return activeKey;
+}
+
 function withoutPrefix<T>(map: Record<string, T>, prefix: string): Record<string, T> {
   const next = { ...map };
   for (const key of Object.keys(next)) if (key.startsWith(prefix)) delete next[key];
@@ -105,7 +123,10 @@ export function useAppState() {
 
   const addFolderSource = useCallback(async (): Promise<{ ok: true } | { ok: false; error: string }> => {
     if (!folderSource.folderSourcesSupported) {
-      return { ok: false, error: "This browser can't pick real folders — try Chrome or Edge, or add a virtual source instead." };
+      const error = folderSource.isBraveBrowser
+        ? "Enable brave://flags/#file-system-access-api and relaunch Brave, or add a virtual source instead."
+        : "This browser can't pick real folders — try Chrome, Edge, or add a virtual source instead.";
+      return { ok: false, error };
     }
     let handle: FileSystemDirectoryHandle;
     try {
@@ -114,7 +135,9 @@ export function useAppState() {
       if ((err as Error).name === "AbortError") return { ok: true };
       return { ok: false, error: (err as Error).message };
     }
-    const source = storage.addSource(currentUserId, handle.name, handle.name, "folder");
+    // Don't default path to the folder's name — it's identical to the label
+    // above it and would just show the same text twice in the sidebar.
+    const source = storage.addSource(currentUserId, handle.name, undefined, "folder");
     refreshUserData();
     await handles.saveHandle(source.id, handle);
     setFolderHandles((prev) => ({ ...prev, [source.id]: handle }));
@@ -287,6 +310,105 @@ export function useAppState() {
     [currentUserId, userData.sources, folderHandles, folderStatus],
   );
 
+  const deleteDoc = useCallback(
+    async (sourceId: string, relPath: string): Promise<{ ok: true } | { ok: false; error: string }> => {
+      const key = docKey(sourceId, relPath);
+      const source = userData.sources.find((s) => s.id === sourceId);
+      if (source?.kind === "folder") {
+        const handle = folderHandles[sourceId];
+        if (!handle || folderStatus[sourceId] !== "connected") {
+          return { ok: false, error: "This folder isn't connected — click Reconnect in the sidebar." };
+        }
+        try {
+          await folderSource.deleteMdFile(handle, relPath);
+        } catch (err) {
+          return { ok: false, error: (err as Error).message };
+        }
+        setFolderDocs((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      } else {
+        setUserData(storage.deleteDoc(currentUserId, key));
+      }
+
+      const wasPinned = pinnedTabs.some((t) => t.key === key);
+      const wasPreview = previewTab?.key === key;
+      const nextActive = nextActiveKeyAfterRemoving(key, pinnedTabs, previewTab, activeKey);
+      if (wasPinned) setPinnedTabs((prev) => prev.filter((t) => t.key !== key));
+      if (wasPreview) setPreviewTab(null);
+      if (activeKey === key) setActiveKey(nextActive);
+      setDocsUi((prev) => {
+        if (!prev[key]) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+
+      return { ok: true };
+    },
+    [currentUserId, userData.sources, folderHandles, folderStatus, pinnedTabs, previewTab, activeKey],
+  );
+
+  const renameDoc = useCallback(
+    async (
+      sourceId: string,
+      relPath: string,
+      newRelPath: string,
+      newName: string,
+    ): Promise<{ ok: true } | { ok: false; error: string }> => {
+      const oldKey = docKey(sourceId, relPath);
+      const newKey = docKey(sourceId, newRelPath);
+      if (oldKey === newKey) return { ok: true };
+      if (docs[newKey] !== undefined) return { ok: false, error: "A file with that name already exists." };
+
+      const source = userData.sources.find((s) => s.id === sourceId);
+      if (source?.kind === "folder") {
+        const handle = folderHandles[sourceId];
+        if (!handle || folderStatus[sourceId] !== "connected") {
+          return { ok: false, error: "This folder isn't connected — click Reconnect in the sidebar." };
+        }
+        try {
+          await folderSource.renameMdFile(handle, relPath, newRelPath);
+        } catch (err) {
+          return { ok: false, error: (err as Error).message };
+        }
+        setFolderDocs((prev) => {
+          const next = { ...prev };
+          next[newKey] = next[oldKey];
+          delete next[oldKey];
+          return next;
+        });
+      } else {
+        const next = storage.renameDoc(currentUserId, oldKey, newKey);
+        if (!next) return { ok: false, error: "A file with that name already exists." };
+        setUserData(next);
+      }
+
+      // Carry over the tab/edit state for this doc to its new key, rather
+      // than closing it — a rename shouldn't feel like closing one file and
+      // opening a different one.
+      setPinnedTabs((prev) =>
+        prev.map((t) => (t.key === oldKey ? { ...t, key: newKey, relPath: newRelPath, name: newName } : t)),
+      );
+      setPreviewTab((prev) =>
+        prev?.key === oldKey ? { ...prev, key: newKey, relPath: newRelPath, name: newName } : prev,
+      );
+      setActiveKey((prev) => (prev === oldKey ? newKey : prev));
+      setDocsUi((prev) => {
+        if (!prev[oldKey]) return prev;
+        const next = { ...prev };
+        next[newKey] = next[oldKey];
+        delete next[oldKey];
+        return next;
+      });
+
+      return { ok: true };
+    },
+    [currentUserId, userData.sources, folderHandles, folderStatus, docs],
+  );
+
   const openDoc = useCallback(
     (source: { id: string; name: string }, relPath: string, name: string, opts?: { pin?: boolean }) => {
       const key = docKey(source.id, relPath);
@@ -357,19 +479,11 @@ export function useAppState() {
    */
   const closeTab = useCallback(
     (key: string) => {
-      const pinnedIdx = pinnedTabs.findIndex((t) => t.key === key);
+      const wasPinned = pinnedTabs.some((t) => t.key === key);
       const wasPreview = previewTab?.key === key;
-      let nextActive = activeKey;
+      const nextActive = nextActiveKeyAfterRemoving(key, pinnedTabs, previewTab, activeKey);
 
-      if (activeKey === key) {
-        if (pinnedIdx !== -1) {
-          nextActive = pinnedTabs[pinnedIdx + 1]?.key ?? pinnedTabs[pinnedIdx - 1]?.key ?? previewTab?.key ?? null;
-        } else if (wasPreview) {
-          nextActive = pinnedTabs[pinnedTabs.length - 1]?.key ?? null;
-        }
-      }
-
-      if (pinnedIdx !== -1) setPinnedTabs((prev) => prev.filter((t) => t.key !== key));
+      if (wasPinned) setPinnedTabs((prev) => prev.filter((t) => t.key !== key));
       if (wasPreview) setPreviewTab(null);
       if (activeKey === key) setActiveKey(nextActive);
 
@@ -482,6 +596,8 @@ export function useAppState() {
     saveDoc,
     isDirty,
     createFile,
+    deleteDoc,
+    renameDoc,
 
     sidebarVisible,
     setSidebarVisible,

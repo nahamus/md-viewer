@@ -13,12 +13,16 @@ There are two kinds of source:
   local profile. Works in any browser.
 - **Folder sources** — backed by a real folder you pick from disk, via the browser's
   [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API).
-  Reads/writes go straight to the real `.md` files. **Chrome/Edge only** — Firefox and
-  Safari don't implement this API, so the "Add a folder from your computer" option won't
-  appear there. The browser also never exposes a real absolute path (only the picked
-  folder's own name), and after a reload the app has to re-verify permission — if it
-  can't do that silently, the source shows as "Disconnected" with a "Reconnect" button
-  (in the sidebar and in "Manage sources") that re-asks for permission.
+  Reads/writes go straight to the real `.md` files. **Chromium browsers only**
+  (Chrome, Edge, Opera, …) — Firefox and Safari don't implement this API at all, so
+  the "Add a folder from your computer" option won't appear there, full stop. **Brave**
+  is a special case: it's Chromium-based and does implement the API, but hides it
+  behind a privacy toggle that's off by default — the app detects Brave specifically and
+  points at `brave://flags/#file-system-access-api` instead of just saying "unsupported."
+  The browser also never exposes a real absolute path (only the picked folder's own
+  name), and after a reload the app has to re-verify permission — if it can't do that
+  silently, the source shows as "Disconnected" with a "Reconnect" button (in the sidebar
+  and in "Manage sources") that re-asks for permission.
 
 Either way, source/profile *metadata* (names, which sources exist, tab layout) lives in
 `localStorage`, so:

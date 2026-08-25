@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useEscapeKey } from "../hooks/useEscapeKey";
-import type { FolderStatus, Source } from "../types";
+import { isBraveBrowser } from "../lib/folderSource";
+import { displayPath, type FolderStatus, type Source } from "../types";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 interface Props {
@@ -144,7 +145,7 @@ export function SourceDialog({
                           {source.kind === "folder" ? "📁 " : ""}
                           {source.name}
                         </span>
-                        {source.path && <span className="source-list-path">{source.path}</span>}
+                        {displayPath(source) && <span className="source-list-path">{displayPath(source)}</span>}
                         {status && status !== "connected" && (
                           <span className="source-status">
                             {status === "unsupported"
@@ -182,9 +183,16 @@ export function SourceDialog({
                 <button type="button" className="secondary-btn" onClick={handleAddFolder} disabled={addingFolder}>
                   📁 {addingFolder ? "Choosing…" : "Add a folder from your computer"}
                 </button>
+              ) : isBraveBrowser ? (
+                <p className="field-hint">
+                  Brave hides this feature behind a privacy setting by default. Enable it at{" "}
+                  <code>brave://flags/#file-system-access-api</code>, relaunch Brave, and it'll appear here — or add
+                  a virtual source below instead.
+                </p>
               ) : (
                 <p className="field-hint">
-                  This browser can't pick real folders (Chrome/Edge only) — add a virtual source below instead.
+                  This browser doesn't support picking real folders (Chrome, Edge, and other Chromium browsers do) —
+                  add a virtual source below instead.
                 </p>
               )}
               {folderError && <p className="form-error">{folderError}</p>}

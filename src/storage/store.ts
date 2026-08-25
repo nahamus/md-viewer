@@ -127,6 +127,29 @@ export function setDocContent(userId: string, key: string, content: string): Use
   return next;
 }
 
+/** Deletes a document. No-op (but still persists) if the key doesn't exist. */
+export function deleteDoc(userId: string, key: string): UserData {
+  const data = loadUserData(userId);
+  const docs = { ...data.docs };
+  delete docs[key];
+  const next = { ...data, docs };
+  saveUserData(userId, next);
+  return next;
+}
+
+/** Renames a document; returns null (without writing) if the target key is already taken. */
+export function renameDoc(userId: string, oldKey: string, newKey: string): UserData | null {
+  const data = loadUserData(userId);
+  if (data.docs[oldKey] === undefined) return null;
+  if (data.docs[newKey] !== undefined) return null;
+  const docs = { ...data.docs };
+  docs[newKey] = docs[oldKey];
+  delete docs[oldKey];
+  const next = { ...data, docs };
+  saveUserData(userId, next);
+  return next;
+}
+
 const emptySession: SessionState = {
   pinnedTabs: [],
   previewTab: null,

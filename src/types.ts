@@ -15,6 +15,11 @@ export interface Source {
 /** Live (per-session) connection state of a "folder" source. */
 export type FolderStatus = "connected" | "disconnected" | "unsupported";
 
+/** A source's path is only worth displaying alongside its name if it says something new. */
+export function displayPath(source: Source): string | undefined {
+  return source.path && source.path !== source.name ? source.path : undefined;
+}
+
 export interface TreeNode {
   name: string;
   relPath: string;
