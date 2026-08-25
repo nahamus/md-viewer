@@ -63,8 +63,14 @@ Open http://localhost:5173.
 Other scripts:
 
 - `npm run build` — type-check and build for production (output in `dist/`).
-- `npm run deploy` — build and publish `dist/` to the `gh-pages` branch (requires the repo
-  to have a `gh-pages`-hosted GitHub Pages site configured, and push access to the remote).
+- `npm run deploy` — build and publish `dist/` to the `gh-pages` branch (only needed if
+  Pages is set to deploy from a branch, not GitHub Actions — see below).
+
+## Deploying
+
+`.github/workflows/deploy.yml` builds and deploys on every push to `main`. In the repo's
+**Settings → Pages**, set **Source** to **"GitHub Actions"** — no branch or `npm run
+deploy` needed; it just runs on push.
 
 ## Using it
 
