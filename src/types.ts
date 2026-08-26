@@ -62,6 +62,9 @@ export interface DocUiState {
   error: string | null;
 }
 
+/** Outcome of a rename/delete request against a doc source. */
+export type FileOpResult = { ok: true } | { ok: false; error: string };
+
 /** The sidebar/tabs layout, persisted per-profile so it survives reloads. */
 export interface SessionState {
   pinnedTabs: OpenDoc[];

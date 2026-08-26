@@ -3,6 +3,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { modKeyLabel } from "../lib/platform";
 import type { DocMode, DocUiState, OpenDoc } from "../types";
+import { CodeBlock } from "./CodeBlock";
 import { EditorView } from "./EditorView";
 import { MarkdownImage } from "./MarkdownImage";
 import { Mermaid } from "./Mermaid";
@@ -60,7 +61,7 @@ export function DocumentPane({
         // draws its own container, so skip the <pre> wrapper for it — otherwise
         // the diagram ends up boxed inside the code-block styling.
         if (isMermaidCodeElement(children)) return <>{children}</>;
-        return <pre>{children}</pre>;
+        return <CodeBlock>{children}</CodeBlock>;
       },
       img({ src, alt }) {
         return <MarkdownImage src={src ?? ""} alt={alt} resolveAsset={isFolderDoc ? resolveAsset : undefined} />;

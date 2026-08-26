@@ -583,6 +583,36 @@ textarea:focus-visible {
   text-overflow: ellipsis;
 }
 
+.tab--renaming {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+}
+
+.tab-rename-input {
+  width: 130px;
+  padding: 3px 6px;
+  font-size: 13px;
+}
+
+.tab-rename-error {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 2px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--danger-solid);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+  z-index: 10;
+}
+
 .empty-state {
   flex: 1 1 auto;
   display: flex;
@@ -868,6 +898,46 @@ textarea:focus-visible {
   padding: 12px;
   border-radius: 6px;
   overflow-x: auto;
+}
+
+.code-block {
+  position: relative;
+  margin: 1em 0;
+}
+
+.code-block pre {
+  margin: 0;
+}
+
+.code-copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.code-block:hover .code-copy-btn,
+.code-copy-btn:focus-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.code-copy-btn:hover {
+  background: var(--accent-bg);
 }
 
 .markdown-body code {

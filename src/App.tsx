@@ -229,6 +229,7 @@ function App() {
             onClose={requestCloseTab}
             onPin={state.pinTab}
             onUnpin={state.unpinTab}
+            onRename={state.renameDoc}
           />
 
           {activeDoc && activeDocUi ? (
@@ -272,7 +273,7 @@ function App() {
           onClose={() => state.setNewFileDialogOpen(false)}
           onCreated={(source, relPath, name) => {
             state.setNewFileDialogOpen(false);
-            state.openDoc(source, relPath, name, { pin: true });
+            state.openDoc(source, relPath, name, { pin: true, mode: "edit" });
             if (!state.expandedKeys.has(`${source.id}::`)) {
               state.toggleExpand(`${source.id}::`);
             }

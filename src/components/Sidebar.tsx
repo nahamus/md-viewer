@@ -1,11 +1,10 @@
 import { useMemo, useState } from "react";
+import { computeRenameTarget } from "../lib/rename";
 import { buildTree } from "../lib/tree";
-import { displayPath, parseDocKey, type FolderStatus, type Source } from "../types";
+import { displayPath, parseDocKey, type FileOpResult, type FolderStatus, type Source } from "../types";
 import { ChevronIcon } from "./ChevronIcon";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { SourceTree } from "./SourceTree";
-
-type RenameResult = { ok: true } | { ok: false; error: string };
 
 const MIN_SIDEBAR_WIDTH = 180;
 const MAX_SIDEBAR_WIDTH = 480;
@@ -23,8 +22,8 @@ interface Props {
   onOpenFile: (source: Source, relPath: string, name: string, opts?: { pin?: boolean }) => void;
   onOpenSearch: () => void;
   onReconnect: (id: string) => void;
-  onRenameFile: (sourceId: string, relPath: string, newRelPath: string, newName: string) => Promise<RenameResult>;
-  onDeleteFile: (sourceId: string, relPath: string) => Promise<RenameResult>;
+  onRenameFile: (sourceId: string, relPath: string, newRelPath: string, newName: string) => Promise<FileOpResult>;
+  onDeleteFile: (sourceId: string, relPath: string) => Promise<FileOpResult>;
 }
 
 export function Sidebar({
@@ -115,21 +114,12 @@ export function Sidebar({
 
   async function commitRename() {
     if (!renaming) return;
-    const trimmed = renaming.value.trim();
-    if (!trimmed) {
+    const target = computeRenameTarget(renaming.relPath, renaming.value);
+    if (!target) {
       setRenaming(null);
       return;
     }
-    const newName = trimmed.toLowerCase().endsWith(".md") ? trimmed : `${trimmed}.md`;
-    const parts = renaming.relPath.split("/");
-    parts[parts.length - 1] = newName;
-    const newRelPath = parts.join("/");
-
-    if (newRelPath === renaming.relPath) {
-      setRenaming(null);
-      return;
-    }
-    const result = await onRenameFile(renaming.source.id, renaming.relPath, newRelPath, newName);
+    const result = await onRenameFile(renaming.source.id, renaming.relPath, target.newRelPath, target.newName);
     if (!result.ok) {
       setRenameError(result.error);
       return;

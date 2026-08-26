@@ -440,7 +440,7 @@ export function useAppState() {
   );
 
   const openDoc = useCallback(
-    (source: { id: string; name: string }, relPath: string, name: string, opts?: { pin?: boolean }) => {
+    (source: { id: string; name: string }, relPath: string, name: string, opts?: { pin?: boolean; mode?: DocMode }) => {
       const key = docKey(source.id, relPath);
       const doc: OpenDoc = {
         key,
@@ -467,7 +467,7 @@ export function useAppState() {
       setDocsUi((prev) => {
         if (prev[key]) return prev;
         const content = docs[key] ?? "";
-        return { ...prev, [key]: { mode: "view", draft: content, saving: false, error: null } };
+        return { ...prev, [key]: { mode: opts?.mode ?? "view", draft: content, saving: false, error: null } };
       });
     },
     [pinnedTabs, docs],
