@@ -1,5 +1,9 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Lightbox } from "./Lightbox";
+
+const ZOOM_STEP = 0.25;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 3;
 
 const prefersDark = typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
 
@@ -33,13 +37,13 @@ function loadMermaid() {
  * sizing and lets a diagram wider than the container actually overflow
  * (and thus scroll) instead of never reaching that width at all.
  */
-function fixMermaidSvgSizing(svg: string): string {
+function fixMermaidSvgSizing(svg: string): { svg: string; naturalWidth: number | null } {
   const match = /max-width:\s*([\d.]+)px;?/i.exec(svg);
   let result = svg.replace(/max-width:\s*[\d.]+px;?/i, "");
   if (match) {
     result = result.replace(/(<svg\b[^>]*\bwidth=")100%(")/i, `$1${match[1]}$2`);
   }
-  return result;
+  return { svg: result, naturalWidth: match ? Number(match[1]) : null };
 }
 
 interface Props {
@@ -51,15 +55,21 @@ export function Mermaid({ chart }: Props) {
   const rawId = useId();
   const id = `mermaid-${rawId.replace(/[^a-zA-Z0-9]/g, "")}`;
   const [svg, setSvg] = useState<string | null>(null);
+  const [naturalWidth, setNaturalWidth] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
     loadMermaid()
       .then(({ default: mermaid }) => mermaid.render(id, chart))
       .then(({ svg }) => {
-        if (!cancelled) setSvg(fixMermaidSvgSizing(svg));
+        if (cancelled) return;
+        const fixed = fixMermaidSvgSizing(svg);
+        setSvg(fixed.svg);
+        setNaturalWidth(fixed.naturalWidth);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -68,6 +78,16 @@ export function Mermaid({ chart }: Props) {
       cancelled = true;
     };
   }, [id, chart]);
+
+  // Zooming resizes the SVG's own width (rather than a CSS transform: scale)
+  // so the browser recomputes real layout size — which is what makes
+  // .diagram-viewport's overflow: auto actually produce a scrollbar for a
+  // zoomed-in diagram, instead of just visually clipping it.
+  useEffect(() => {
+    if (!naturalWidth) return;
+    const svgEl = viewportRef.current?.querySelector("svg");
+    if (svgEl) svgEl.style.width = `${naturalWidth * zoom}px`;
+  }, [zoom, naturalWidth, svg]);
 
   if (error) {
     return (
@@ -86,12 +106,45 @@ export function Mermaid({ chart }: Props) {
   /* eslint-disable react/no-danger */
   return (
     <>
-      <div
-        className="mermaid-diagram"
-        title="Click to enlarge"
-        onClick={() => setExpanded(true)}
-        dangerouslySetInnerHTML={{ __html: svg }}
-      />
+      <div className="diagram-frame">
+        <div className="diagram-toolbar">
+          <button
+            type="button"
+            className="icon-btn"
+            title="Zoom out"
+            aria-label="Zoom out"
+            disabled={zoom <= MIN_ZOOM}
+            onClick={() => setZoom((z) => Math.max(MIN_ZOOM, z - ZOOM_STEP))}
+          >
+            −
+          </button>
+          <span className="diagram-zoom-level">{Math.round(zoom * 100)}%</span>
+          <button
+            type="button"
+            className="icon-btn"
+            title="Zoom in"
+            aria-label="Zoom in"
+            disabled={zoom >= MAX_ZOOM}
+            onClick={() => setZoom((z) => Math.min(MAX_ZOOM, z + ZOOM_STEP))}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            title="Reset zoom"
+            aria-label="Reset zoom"
+            disabled={zoom === 1}
+            onClick={() => setZoom(1)}
+          >
+            ⟲
+          </button>
+          <button type="button" className="icon-btn" title="Expand" aria-label="Expand" onClick={() => setExpanded(true)}>
+            ⛶
+          </button>
+        </div>
+        <div className="diagram-viewport" ref={viewportRef} dangerouslySetInnerHTML={{ __html: svg }} />
+      </div>
       {expanded && (
         <Lightbox onClose={() => setExpanded(false)}>
           <div className="mermaid-diagram-large" dangerouslySetInnerHTML={{ __html: svg }} />

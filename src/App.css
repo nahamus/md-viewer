@@ -439,8 +439,7 @@ textarea:focus-visible {
 }
 
 .tree-item:hover .tree-item-actions,
-.tree-item:focus-within .tree-item-actions,
-.tree-row--active ~ .tree-item-actions {
+.tree-item:focus-within .tree-item-actions {
   opacity: 1;
   pointer-events: auto;
 }
@@ -757,6 +756,7 @@ textarea:focus-visible {
 /* Shared by the Edit and Raw panels: a scrollable line-number gutter next
    to either an editable textarea or a read-only <pre>. */
 .line-numbered-panel {
+  position: relative;
   display: flex;
   align-items: stretch;
   width: 100%;
@@ -768,6 +768,28 @@ textarea:focus-visible {
   box-sizing: border-box;
   overflow: hidden;
   resize: vertical;
+}
+
+/* Full-width band behind the current line, positioned from measured
+   (wrap-aware) line heights — see useLineGutter. Sits behind the gutter and
+   textarea (both are transparent) via DOM order, not z-index. */
+.current-line-highlight {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--accent-bg);
+  pointer-events: none;
+}
+
+/* Same font/padding/wrap rules as .edit-view (applied via that class),
+   rendered off-screen purely so JS can measure each line's real height. */
+.line-metrics-mirror {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  height: auto;
+  pointer-events: none;
 }
 
 .line-gutter {
@@ -864,22 +886,74 @@ textarea:focus-visible {
 /* Diagrams stay in the normal document column (no pop-out/breakout — an
    earlier version tried that with container-query units, but its centering
    math referenced a different box than its width did, so it drifted out of
-   alignment as the window resized). A diagram wider than the column just
-   scrolls horizontally in place, like a wide table or code block would. */
-.mermaid-diagram {
+   alignment as the window resized). A bordered frame (VS Code-style) holds
+   a hover-revealed zoom toolbar plus the actual scrollable diagram. */
+.diagram-frame {
+  position: relative;
+  margin: 1em 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--code-bg);
+}
+
+.diagram-toolbar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 7px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  pointer-events: none;
+}
+
+.diagram-frame:hover .diagram-toolbar,
+.diagram-frame:focus-within .diagram-toolbar {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.diagram-toolbar .icon-btn {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.diagram-toolbar .icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.diagram-zoom-level {
+  min-width: 34px;
+  text-align: center;
+  font-size: 11px;
+  opacity: 0.7;
+  user-select: none;
+}
+
+.diagram-viewport {
   display: flex;
   justify-content: flex-start;
-  overflow-x: auto;
-  margin: 1em 0;
-  cursor: zoom-in;
+  overflow: auto;
+  padding: 16px;
 }
 
 /* No max-width/height here on purpose: the diagram should render at its
-   real, legible size always and get a horizontal scrollbar (via
-   overflow-x: auto above) when it doesn't fit — not shrink as the window
-   narrows, which would make the text illegible again. */
-.mermaid-diagram svg {
+   real, legible size always (or the size the zoom toolbar set) and get a
+   scrollbar (via .diagram-viewport's overflow: auto) when it doesn't fit —
+   not shrink as the window narrows, which would make the text illegible. */
+.diagram-viewport svg {
   display: block;
+  flex: none;
 }
 
 .mermaid-loading {
