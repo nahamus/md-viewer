@@ -26,7 +26,7 @@ type ProfileDialogState = { mode: "create" } | { mode: "edit"; user: UserProfile
 
 function App() {
   const state = useAppState();
-  const { docs, isDirty, saveDoc, cancelEdit, setSidebarVisible, setSearchDialogOpen } = state;
+  const { docs, isDirty, saveDoc, setSidebarVisible, setSearchDialogOpen } = state;
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [profileDialog, setProfileDialog] = useState<ProfileDialogState>(null);
 
@@ -76,8 +76,25 @@ function App() {
     });
   }
 
+  function requestCancelEdit(key: string) {
+    if (isDirty(key)) {
+      setConfirmRequest({
+        title: "Discard changes?",
+        message: "This document has unsaved edits. Cancelling will discard them.",
+        confirmLabel: "Discard",
+        danger: true,
+        onConfirm: () => state.cancelEdit(key),
+      });
+    } else {
+      state.cancelEdit(key);
+    }
+  }
+
   const { activeDoc } = state;
   const activeContent = activeDoc ? (docs[activeDoc.key] ?? "") : "";
+  const isFolderDoc = activeDoc
+    ? state.sources.find((s) => s.id === activeDoc.sourceId)?.kind === "folder"
+    : false;
   // Tabs restored from a previous session never went through openDoc(), so
   // they may not have a docsUi entry yet — fall back to a plain view state
   // rather than showing the empty-state placeholder for an open tab.
@@ -108,14 +125,15 @@ function App() {
         e.preventDefault();
         setSearchDialogOpen(true);
       } else if (e.key === "Escape" && !anyModalOpen && activeDoc && activeDocUi?.mode === "edit") {
-        cancelEdit(activeDoc.key);
+        requestCancelEdit(activeDoc.key);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
     // activeDocUi is recreated on every render when it falls back to a
     // default (see above) — depend on its primitive fields instead so this
-    // effect doesn't re-subscribe every render.
+    // effect doesn't re-subscribe every render. requestCancelEdit itself
+    // isn't memoized, so depend on the stable pieces it's built from instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeDoc,
@@ -126,8 +144,23 @@ function App() {
     saveDoc,
     setSidebarVisible,
     setSearchDialogOpen,
-    cancelEdit,
+    isDirty,
+    state.cancelEdit,
   ]);
+
+  // Warn before closing/reloading the tab with unsaved edits — otherwise
+  // they're silently lost with no confirmation at all (unlike closing a tab
+  // or switching profiles, which already confirm).
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (dirtyKeys.size > 0) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [dirtyKeys]);
 
   return (
     <div className="app-shell">
@@ -174,7 +207,10 @@ function App() {
             folderStatus={state.folderStatus}
             expandedKeys={state.expandedKeys}
             activeKey={state.activeKey}
+            width={state.sidebarWidth}
+            onWidthChange={state.setSidebarWidth}
             onToggleExpand={state.toggleExpand}
+            onCollapseAll={state.collapseAll}
             onOpenFile={state.openDoc}
             onOpenSearch={() => state.setSearchDialogOpen(true)}
             onReconnect={state.reconnectFolderSource}
@@ -200,10 +236,12 @@ function App() {
               doc={activeDoc}
               content={activeContent}
               ui={activeDocUi}
+              isFolderDoc={isFolderDoc}
               onSetMode={(mode) => state.setMode(activeDoc.key, mode)}
               onDraftChange={(value) => state.setDraft(activeDoc.key, value)}
               onSave={() => state.saveDoc(activeDoc)}
-              onCancel={() => state.cancelEdit(activeDoc.key)}
+              onCancel={() => requestCancelEdit(activeDoc.key)}
+              onResolveAsset={state.resolveFolderAsset}
             />
           ) : (
             <div className="empty-state">

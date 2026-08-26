@@ -83,8 +83,8 @@ deploy` needed; it just runs on push.
 2. Click a file once in the sidebar to open it in the italic **preview tab** (reused for
    the next file you click); double-click a file, or click its pin icon, to keep it open
    in a permanent tab.
-3. Use the document toolbar to switch between **View** (rendered), **Raw** (source text),
-   and **Edit** (with Save/Cancel).
+3. Use the document toolbar to switch between **View** (rendered) and **Edit** (the raw
+   source, with line numbers, and Save/Cancel).
 4. Click the 🔍 icon in the sidebar, or press `Ctrl/⌘+P`, to search file names and content
    across every source.
 5. Use the profile switcher (top right — shows "Default" until you set it up) to create,

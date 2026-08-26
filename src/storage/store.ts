@@ -156,10 +156,13 @@ const emptySession: SessionState = {
   activeKey: null,
   expandedKeys: [],
   sidebarVisible: true,
+  sidebarWidth: 260,
 };
 
 export function loadSession(userId: string): SessionState {
-  return readJson(sessionKey(userId), emptySession);
+  // Merge over defaults so a session saved before a new field existed
+  // (e.g. sidebarWidth) doesn't come back with that field `undefined`.
+  return { ...emptySession, ...readJson(sessionKey(userId), emptySession) };
 }
 
 export function saveSession(userId: string, session: SessionState) {

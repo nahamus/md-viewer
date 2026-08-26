@@ -35,7 +35,6 @@ export function SourceDialog({
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [folderError, setFolderError] = useState<string | null>(null);
   const [addingFolder, setAddingFolder] = useState(false);
-  const [reconnectingId, setReconnectingId] = useState<string | null>(null);
 
   // Only close this dialog on Escape if the nested remove-confirmation isn't
   // covering it (that dialog handles Escape itself, both listeners are global).
@@ -61,9 +60,7 @@ export function SourceDialog({
   }
 
   async function handleReconnect(id: string) {
-    setReconnectingId(id);
     const result = await onReconnect(id);
-    setReconnectingId(null);
     if (!result.ok) setFolderError(result.error);
   }
 
@@ -97,7 +94,7 @@ export function SourceDialog({
             {sources.length === 0 && <p className="sidebar-empty">No sources added yet.</p>}
             <ul className="source-list">
               {sources.map((source) => {
-                const status = source.kind === "folder" ? (folderStatus[source.id] ?? "disconnected") : null;
+                const status = source.kind === "folder" ? (folderStatus[source.id] ?? "connecting") : null;
                 return (
                   <li key={source.id} className="source-list-item">
                     {editingId === source.id ? (
@@ -146,18 +143,16 @@ export function SourceDialog({
                           {source.name}
                         </span>
                         {displayPath(source) && <span className="source-list-path">{displayPath(source)}</span>}
-                        {status && status !== "connected" && (
+                        {status === "connecting" && <span className="source-status-connecting">Connecting…</span>}
+                        {status === "unsupported" && (
+                          <span className="source-status">This browser can't reconnect real folders</span>
+                        )}
+                        {status === "disconnected" && (
                           <span className="source-status">
-                            {status === "unsupported"
-                              ? "This browser can't reconnect real folders"
-                              : reconnectingId === source.id
-                                ? "Reconnecting…"
-                                : "Disconnected"}
-                            {status === "disconnected" && reconnectingId !== source.id && (
-                              <button type="button" className="link-btn" onClick={() => handleReconnect(source.id)}>
-                                Reconnect
-                              </button>
-                            )}
+                            Disconnected
+                            <button type="button" className="link-btn" onClick={() => handleReconnect(source.id)}>
+                              Reconnect
+                            </button>
                           </span>
                         )}
                       </div>

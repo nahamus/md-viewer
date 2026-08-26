@@ -47,8 +47,10 @@ export function SourceTree({
                 className="tree-row tree-row--dir"
                 onClick={() => onToggleExpand(expandKey)}
                 style={{ paddingLeft: `${depth * 14 + 8}px` }}
+                data-expandable="true"
+                data-expanded={isExpanded}
               >
-                <span className={`chevron ${isExpanded ? "chevron--open" : ""}`}>▸</span>
+                <span className={`chevron ${isExpanded ? "chevron--open" : ""}`}>{">"}</span>
                 <span className="tree-icon">📁</span>
                 <span className="tree-label">{child.name}</span>
               </button>

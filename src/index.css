@@ -19,6 +19,11 @@
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
+  /* A little editorial personality for the brand wordmark only — a serif
+     reads as "document," which fits, without touching the rest of the UI's
+     functional, neutral sans-serif. Self-hosted system fonts only, no
+     external font requests. */
+  --brand: Georgia, 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Noto Serif', serif;
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;

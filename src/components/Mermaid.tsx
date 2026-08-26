@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { Lightbox } from "./Lightbox";
 
 const prefersDark = typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
 
@@ -27,6 +28,7 @@ export function Mermaid({ chart }: Props) {
   const id = `mermaid-${rawId.replace(/[^a-zA-Z0-9]/g, "")}`;
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,6 +59,21 @@ export function Mermaid({ chart }: Props) {
   // mermaid.render() returns markup it generated from parsing the diagram
   // source (in "strict" security mode, which sanitizes label content) — not
   // a pass-through of arbitrary HTML.
-  // eslint-disable-next-line react/no-danger
-  return <div className="mermaid-diagram" dangerouslySetInnerHTML={{ __html: svg }} />;
+  /* eslint-disable react/no-danger */
+  return (
+    <>
+      <div
+        className="mermaid-diagram"
+        title="Click to enlarge"
+        onClick={() => setExpanded(true)}
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+      {expanded && (
+        <Lightbox onClose={() => setExpanded(false)}>
+          <div className="mermaid-diagram-large" dangerouslySetInnerHTML={{ __html: svg }} />
+        </Lightbox>
+      )}
+    </>
+  );
+  /* eslint-enable react/no-danger */
 }

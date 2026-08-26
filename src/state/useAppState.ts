@@ -53,6 +53,7 @@ export function useAppState() {
   const [previewTab, setPreviewTab] = useState<OpenDoc | null>(() => storage.loadSession(currentUserId).previewTab);
   const [activeKey, setActiveKey] = useState<string | null>(() => storage.loadSession(currentUserId).activeKey);
   const [sidebarVisible, setSidebarVisible] = useState(() => storage.loadSession(currentUserId).sidebarVisible);
+  const [sidebarWidth, setSidebarWidth] = useState(() => storage.loadSession(currentUserId).sidebarWidth);
   const [docsUi, setDocsUi] = useState<Record<string, DocUiState>>({});
 
   // "folder" sources are backed by a real picked directory; their handle and
@@ -94,6 +95,16 @@ export function useAppState() {
     let cancelled = false;
     (async () => {
       const folderSources = userDataRef.current.sources.filter((s) => s.kind === "folder");
+      // Mark all of them "connecting" up front (rather than one at a time as
+      // the loop below reaches each) so the sidebar shows a loading state
+      // instead of treating an as-yet-unprocessed source as "disconnected".
+      if (folderSources.length > 0) {
+        setFolderStatus((prev) => {
+          const next = { ...prev };
+          for (const source of folderSources) next[source.id] = "connecting";
+          return next;
+        });
+      }
       for (const source of folderSources) {
         if (!folderSource.folderSourcesSupported) {
           if (!cancelled) setFolderStatus((prev) => ({ ...prev, [source.id]: "unsupported" }));
@@ -152,6 +163,7 @@ export function useAppState() {
 
   const reconnectFolderSource = useCallback(
     async (id: string): Promise<{ ok: true } | { ok: false; error: string }> => {
+      setFolderStatus((prev) => ({ ...prev, [id]: "connecting" }));
       const handle = folderHandles[id] ?? (await handles.loadHandle(id));
       if (!handle) return { ok: false, error: "This folder's connection was lost — remove it and add it again." };
       const granted = await folderSource.verifyPermission(handle, false);
@@ -171,6 +183,21 @@ export function useAppState() {
     [folderHandles, loadFolderContents],
   );
 
+  /** Resolves a relative asset path (e.g. an image) referenced from a folder-source document. */
+  const resolveFolderAsset = useCallback(
+    async (sourceId: string, fromRelPath: string, assetPath: string): Promise<string | null> => {
+      const handle = folderHandles[sourceId];
+      if (!handle || folderStatus[sourceId] !== "connected") return null;
+      try {
+        const resolvedPath = folderSource.resolveRelativePath(fromRelPath, assetPath);
+        return await folderSource.readFileAsObjectUrl(handle, resolvedPath);
+      } catch {
+        return null;
+      }
+    },
+    [folderHandles, folderStatus],
+  );
+
   // --- Profiles ---
 
   const switchUser = useCallback((id: string) => {
@@ -183,6 +210,7 @@ export function useAppState() {
     setActiveKey(session.activeKey);
     setExpandedKeys(new Set(session.expandedKeys));
     setSidebarVisible(session.sidebarVisible);
+    setSidebarWidth(session.sidebarWidth);
     setDocsUi({});
     setFolderHandles({});
     setFolderDocs({});
@@ -279,6 +307,8 @@ export function useAppState() {
       return next;
     });
   }, []);
+
+  const collapseAll = useCallback(() => setExpandedKeys(new Set()), []);
 
   const createFile = useCallback(
     async (sourceId: string, relPath: string): Promise<{ ok: true } | { ok: false; error: string }> => {
@@ -556,8 +586,9 @@ export function useAppState() {
       activeKey,
       expandedKeys: Array.from(expandedKeys),
       sidebarVisible,
+      sidebarWidth,
     });
-  }, [currentUserId, pinnedTabs, previewTab, activeKey, expandedKeys, sidebarVisible]);
+  }, [currentUserId, pinnedTabs, previewTab, activeKey, expandedKeys, sidebarVisible, sidebarWidth]);
 
   return {
     users,
@@ -576,9 +607,11 @@ export function useAppState() {
     folderStatus,
     addFolderSource,
     reconnectFolderSource,
+    resolveFolderAsset,
 
     expandedKeys,
     toggleExpand,
+    collapseAll,
 
     pinnedTabs,
     previewTab,
@@ -601,6 +634,8 @@ export function useAppState() {
 
     sidebarVisible,
     setSidebarVisible,
+    sidebarWidth,
+    setSidebarWidth,
     sourceDialogOpen,
     setSourceDialogOpen,
     newFileDialogOpen,

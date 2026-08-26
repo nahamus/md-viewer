@@ -1,8 +1,10 @@
-import { isValidElement } from "react";
+import { isValidElement, useCallback, useMemo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { modKeyLabel } from "../lib/platform";
 import type { DocMode, DocUiState, OpenDoc } from "../types";
+import { EditorView } from "./EditorView";
+import { MarkdownImage } from "./MarkdownImage";
 import { Mermaid } from "./Mermaid";
 
 function isMermaidCodeElement(node: unknown): boolean {
@@ -11,38 +13,61 @@ function isMermaidCodeElement(node: unknown): boolean {
   return typeof className === "string" && className.includes("language-mermaid");
 }
 
-const markdownComponents: Components = {
-  code({ className, children }) {
-    const language = /language-(\w+)/.exec(className ?? "")?.[1];
-    if (language === "mermaid") {
-      const chart = String(children).replace(/\n$/, "");
-      return <Mermaid key={chart} chart={chart} />;
-    }
-    return <code className={className}>{children}</code>;
-  },
-  pre({ children }) {
-    // Fenced ```mermaid blocks come in as <pre><code class="language-mermaid">.
-    // The Mermaid component (rendered by the `code` override above) already
-    // draws its own container, so skip the <pre> wrapper for it — otherwise
-    // the diagram ends up boxed inside the code-block styling.
-    if (isMermaidCodeElement(children)) return <>{children}</>;
-    return <pre>{children}</pre>;
-  },
-};
-
 interface Props {
   doc: OpenDoc;
   content: string;
   ui: DocUiState;
+  isFolderDoc: boolean;
   onSetMode: (mode: DocMode) => void;
   onDraftChange: (value: string) => void;
   onSave: () => void;
   onCancel: () => void;
+  onResolveAsset: (sourceId: string, fromRelPath: string, assetPath: string) => Promise<string | null>;
 }
 
-export function DocumentPane({ doc, content, ui, onSetMode, onDraftChange, onSave, onCancel }: Props) {
+export function DocumentPane({
+  doc,
+  content,
+  ui,
+  isFolderDoc,
+  onSetMode,
+  onDraftChange,
+  onSave,
+  onCancel,
+  onResolveAsset,
+}: Props) {
   const isEditing = ui.mode === "edit";
   const dirty = isEditing && ui.draft !== content;
+
+  const resolveAsset = useCallback(
+    (assetPath: string) => onResolveAsset(doc.sourceId, doc.relPath, assetPath),
+    [doc.sourceId, doc.relPath, onResolveAsset],
+  );
+
+  const markdownComponents = useMemo<Components>(
+    () => ({
+      code({ className, children }) {
+        const language = /language-(\w+)/.exec(className ?? "")?.[1];
+        if (language === "mermaid") {
+          const chart = String(children).replace(/\n$/, "");
+          return <Mermaid key={chart} chart={chart} />;
+        }
+        return <code className={className}>{children}</code>;
+      },
+      pre({ children }) {
+        // Fenced ```mermaid blocks come in as <pre><code class="language-mermaid">.
+        // The Mermaid component (rendered by the `code` override above) already
+        // draws its own container, so skip the <pre> wrapper for it — otherwise
+        // the diagram ends up boxed inside the code-block styling.
+        if (isMermaidCodeElement(children)) return <>{children}</>;
+        return <pre>{children}</pre>;
+      },
+      img({ src, alt }) {
+        return <MarkdownImage src={src ?? ""} alt={alt} resolveAsset={isFolderDoc ? resolveAsset : undefined} />;
+      },
+    }),
+    [isFolderDoc, resolveAsset],
+  );
 
   return (
     <div className="document-pane">
@@ -62,7 +87,7 @@ export function DocumentPane({ doc, content, ui, onSetMode, onDraftChange, onSav
                 title={`Save (${modKeyLabel}+S)`}
                 aria-label="Save"
               >
-                {ui.saving ? "⏳" : "💾"}
+                {ui.saving ? <span className="spinner" /> : "✓"}
               </button>
               <button
                 type="button"
@@ -76,35 +101,15 @@ export function DocumentPane({ doc, content, ui, onSetMode, onDraftChange, onSav
               </button>
             </>
           ) : (
-            <>
-              <button
-                type="button"
-                className={`icon-action-btn ${ui.mode === "view" ? "icon-action-btn--active" : ""}`}
-                onClick={() => onSetMode("view")}
-                title="Rendered view"
-                aria-label="Rendered view"
-              >
-                👁
-              </button>
-              <button
-                type="button"
-                className={`icon-action-btn icon-action-btn--mono ${ui.mode === "raw" ? "icon-action-btn--active" : ""}`}
-                onClick={() => onSetMode("raw")}
-                title="Raw source"
-                aria-label="Raw source"
-              >
-                {"</>"}
-              </button>
-              <button
-                type="button"
-                className="icon-action-btn"
-                onClick={() => onSetMode("edit")}
-                title="Edit"
-                aria-label="Edit"
-              >
-                ✎
-              </button>
-            </>
+            <button
+              type="button"
+              className="icon-action-btn"
+              onClick={() => onSetMode("edit")}
+              title="Edit"
+              aria-label="Edit"
+            >
+              ✎
+            </button>
           )}
         </div>
       </div>
@@ -118,15 +123,7 @@ export function DocumentPane({ doc, content, ui, onSetMode, onDraftChange, onSav
             </ReactMarkdown>
           </div>
         )}
-        {ui.mode === "raw" && <pre className="raw-view">{content}</pre>}
-        {ui.mode === "edit" && (
-          <textarea
-            className="edit-view"
-            value={ui.draft}
-            onChange={(e) => onDraftChange(e.target.value)}
-            spellCheck={false}
-          />
-        )}
+        {ui.mode === "edit" && <EditorView value={ui.draft} onChange={onDraftChange} />}
       </div>
     </div>
   );

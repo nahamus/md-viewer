@@ -110,6 +110,31 @@ export async function renameMdFile(
   await deleteMdFile(dirHandle, oldRelPath);
 }
 
+/** True for URLs that already point somewhere specific — no resolution needed. */
+export function isAbsoluteUrl(url: string): boolean {
+  return /^([a-z][a-z0-9+.-]*:|\/)/i.test(url);
+}
+
+/** Resolves a `./` / `../`-style path against the directory containing `fromRelPath`. */
+export function resolveRelativePath(fromRelPath: string, target: string): string {
+  const baseDir = fromRelPath.includes("/") ? fromRelPath.slice(0, fromRelPath.lastIndexOf("/")) : "";
+  const combined = baseDir ? `${baseDir}/${target}` : target;
+  const stack: string[] = [];
+  for (const part of combined.split("/")) {
+    if (part === "" || part === ".") continue;
+    if (part === "..") stack.pop();
+    else stack.push(part);
+  }
+  return stack.join("/");
+}
+
+/** Reads an arbitrary file (e.g. an image referenced by a document) as a blob: URL. */
+export async function readFileAsObjectUrl(dirHandle: FileSystemDirectoryHandle, relPath: string): Promise<string> {
+  const fileHandle = await resolveFileHandle(dirHandle, relPath);
+  const file = await fileHandle.getFile();
+  return URL.createObjectURL(file);
+}
+
 /**
  * Checks (and if needed, asks for) readwrite permission on a stored handle.
  * `requestPermission` requires an active user gesture — only call this from

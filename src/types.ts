@@ -13,7 +13,7 @@ export interface Source {
 }
 
 /** Live (per-session) connection state of a "folder" source. */
-export type FolderStatus = "connected" | "disconnected" | "unsupported";
+export type FolderStatus = "connecting" | "connected" | "disconnected" | "unsupported";
 
 /** A source's path is only worth displaying alongside its name if it says something new. */
 export function displayPath(source: Source): string | undefined {
@@ -43,7 +43,7 @@ export interface UserData {
   docs: Record<string, string>;
 }
 
-export type DocMode = "view" | "raw" | "edit";
+export type DocMode = "view" | "edit";
 
 export interface OpenDoc {
   key: string;
@@ -69,6 +69,7 @@ export interface SessionState {
   activeKey: string | null;
   expandedKeys: string[];
   sidebarVisible: boolean;
+  sidebarWidth: number;
 }
 
 const KEY_SEP = "::";
