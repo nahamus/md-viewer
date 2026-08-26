@@ -1,4 +1,5 @@
 import { docKey, type Source, type TreeNode } from "../types";
+import { ChevronIcon } from "./ChevronIcon";
 
 export interface FileActions {
   renamingKey: string | null;
@@ -50,7 +51,7 @@ export function SourceTree({
                 data-expandable="true"
                 data-expanded={isExpanded}
               >
-                <span className={`chevron ${isExpanded ? "chevron--open" : ""}`}>{">"}</span>
+                <ChevronIcon className={`chevron ${isExpanded ? "chevron--open" : ""}`} />
                 <span className="tree-icon">📁</span>
                 <span className="tree-label">{child.name}</span>
               </button>

@@ -18,6 +18,30 @@ function loadMermaid() {
   return mermaidPromise;
 }
 
+/**
+ * mermaid always emits its root <svg> as `width="100%" style="max-width:
+ * {natural}px;"` (see calculateSvgSizeAttrs in its source). The inline style
+ * beats any CSS rule of ours, so stripping just that fixed the "always
+ * tiny" case — but left `width="100%"` behind, which is a *percentage* of
+ * whatever CSS gives the SVG's own container. Since that container is
+ * itself sized via `width: max-content` (to let wide diagrams grow past the
+ * narrow prose column), the two chase each other: max-content needs the
+ * child's intrinsic size, but the child's width is "100% of my parent" —
+ * there is no intrinsic size to compute, so it collapses. Replacing 100%
+ * with the real pixel width mermaid already told us (from that same style
+ * attribute) gives the SVG a genuine intrinsic size, which fixes both the
+ * sizing and lets a diagram wider than the container actually overflow
+ * (and thus scroll) instead of never reaching that width at all.
+ */
+function fixMermaidSvgSizing(svg: string): string {
+  const match = /max-width:\s*([\d.]+)px;?/i.exec(svg);
+  let result = svg.replace(/max-width:\s*[\d.]+px;?/i, "");
+  if (match) {
+    result = result.replace(/(<svg\b[^>]*\bwidth=")100%(")/i, `$1${match[1]}$2`);
+  }
+  return result;
+}
+
 interface Props {
   chart: string;
 }
@@ -35,7 +59,7 @@ export function Mermaid({ chart }: Props) {
     loadMermaid()
       .then(({ default: mermaid }) => mermaid.render(id, chart))
       .then(({ svg }) => {
-        if (!cancelled) setSvg(svg);
+        if (!cancelled) setSvg(fixMermaidSvgSizing(svg));
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));

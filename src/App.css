@@ -505,11 +505,9 @@ textarea:focus-visible {
 }
 
 .chevron {
-  display: inline-block;
+  display: inline-flex;
+  flex: 0 0 auto;
   transition: transform 0.15s ease;
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 600;
   opacity: 0.7;
 }
 
@@ -750,9 +748,6 @@ textarea:focus-visible {
   flex: 1 1 auto;
   overflow-y: auto;
   padding: 20px 24px;
-  /* Lets .mermaid-diagram size itself against this pane's real width via
-     container query units, rather than the narrower 780px prose column. */
-  container-type: inline-size;
 }
 
 .document-status {
@@ -866,32 +861,25 @@ textarea:focus-visible {
   font-size: 13px;
 }
 
+/* Diagrams stay in the normal document column (no pop-out/breakout — an
+   earlier version tried that with container-query units, but its centering
+   math referenced a different box than its width did, so it drifted out of
+   alignment as the window resized). A diagram wider than the column just
+   scrolls horizontally in place, like a wide table or code block would. */
 .mermaid-diagram {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   overflow-x: auto;
   margin: 1em 0;
   cursor: zoom-in;
 }
 
-/* Let a wide diagram break out of the 780px prose column, up to the actual
-   document pane's width (not the viewport — that would ignore the sidebar) —
-   so it only shrinks once it's genuinely wider than the space available,
-   instead of always shrinking to fit inside the reading column. Falls back
-   to the old shrink-to-column behavior in browsers without container query
-   unit support, rather than risking an uncontained overflow there. */
-@supports (width: 1cqw) {
-  .mermaid-diagram {
-    width: max-content;
-    max-width: 92cqw;
-    margin-left: 50%;
-    transform: translateX(-50%);
-  }
-}
-
+/* No max-width/height here on purpose: the diagram should render at its
+   real, legible size always and get a horizontal scrollbar (via
+   overflow-x: auto above) when it doesn't fit — not shrink as the window
+   narrows, which would make the text illegible again. */
 .mermaid-diagram svg {
-  max-width: 100%;
-  height: auto;
+  display: block;
 }
 
 .mermaid-loading {
@@ -968,9 +956,12 @@ textarea:focus-visible {
   object-fit: contain;
 }
 
+/* Enlarged view: also render at true natural size — .lightbox-content's own
+   overflow: auto (above) handles scrolling in both directions if the
+   diagram is bigger than the viewport, rather than shrinking it to fit. */
 .mermaid-diagram-large svg {
   max-width: none;
-  max-height: 88vh;
+  max-height: none;
 }
 
 .lightbox-close {

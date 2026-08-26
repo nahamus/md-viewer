@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { buildTree } from "../lib/tree";
 import { displayPath, parseDocKey, type FolderStatus, type Source } from "../types";
+import { ChevronIcon } from "./ChevronIcon";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { SourceTree } from "./SourceTree";
 
@@ -190,7 +191,7 @@ export function Sidebar({
                 data-expandable="true"
                 data-expanded={isExpanded}
               >
-                <span className={`chevron ${isExpanded ? "chevron--open" : ""}`}>{">"}</span>
+                <ChevronIcon className={`chevron ${isExpanded ? "chevron--open" : ""}`} />
                 <span className="tree-icon">{source.kind === "folder" ? "📁" : "📚"}</span>
                 <span className="tree-label">{source.name}</span>
               </button>
