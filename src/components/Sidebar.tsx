@@ -22,6 +22,7 @@ interface Props {
   onOpenFile: (source: Source, relPath: string, name: string, opts?: { pin?: boolean }) => void;
   onOpenSearch: () => void;
   onReconnect: (id: string) => void;
+  onRefreshFolder: (id: string) => Promise<FileOpResult>;
   onRenameFile: (sourceId: string, relPath: string, newRelPath: string, newName: string) => Promise<FileOpResult>;
   onDeleteFile: (sourceId: string, relPath: string) => Promise<FileOpResult>;
 }
@@ -39,12 +40,14 @@ export function Sidebar({
   onOpenFile,
   onOpenSearch,
   onReconnect,
+  onRefreshFolder,
   onRenameFile,
   onDeleteFile,
 }: Props) {
   const [renaming, setRenaming] = useState<{ source: Source; relPath: string; value: string } | null>(null);
   const [renameError, setRenameError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<{ source: Source; relPath: string; name: string } | null>(null);
+  const [refreshError, setRefreshError] = useState<{ id: string; message: string } | null>(null);
   const [liveWidth, setLiveWidth] = useState(width);
   const [syncedWidth, setSyncedWidth] = useState(width);
 
@@ -173,18 +176,38 @@ export function Sidebar({
           const path = displayPath(source);
           return (
             <div className="source-block" key={source.id}>
-              <button
-                type="button"
-                className="tree-row tree-row--source"
-                onClick={() => onToggleExpand(expandKey)}
-                title={path}
-                data-expandable="true"
-                data-expanded={isExpanded}
-              >
-                <ChevronIcon className={`chevron ${isExpanded ? "chevron--open" : ""}`} />
-                <span className="tree-icon">{source.kind === "folder" ? "📁" : "📚"}</span>
-                <span className="tree-label">{source.name}</span>
-              </button>
+              <div className="source-row-wrap">
+                <button
+                  type="button"
+                  className="tree-row tree-row--source"
+                  onClick={() => onToggleExpand(expandKey)}
+                  title={path}
+                  data-expandable="true"
+                  data-expanded={isExpanded}
+                >
+                  <ChevronIcon className={`chevron ${isExpanded ? "chevron--open" : ""}`} />
+                  <span className="tree-icon">{source.kind === "folder" ? "📁" : "📚"}</span>
+                  <span className="tree-label">{source.name}</span>
+                </button>
+                {source.kind === "folder" && status === "connected" && (
+                  <div className="tree-item-actions">
+                    <button
+                      type="button"
+                      className="tree-action-btn"
+                      title="Refresh (pick up changes made outside the app)"
+                      aria-label="Refresh"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        setRefreshError(null);
+                        const result = await onRefreshFolder(source.id);
+                        if (!result.ok) setRefreshError({ id: source.id, message: result.error });
+                      }}
+                    >
+                      🔄
+                    </button>
+                  </div>
+                )}
+              </div>
               {path && <div className="tree-source-path">{path}</div>}
               {status === "connecting" && <div className="tree-source-path source-status-connecting">Connecting…</div>}
               {status === "disconnected" && (
@@ -197,6 +220,9 @@ export function Sidebar({
               )}
               {status === "unsupported" && (
                 <div className="tree-source-path source-status">Can't reconnect in this browser</div>
+              )}
+              {refreshError?.id === source.id && (
+                <div className="tree-source-path tree-rename-error">{refreshError.message}</div>
               )}
               {isExpanded && root && (
                 <SourceTree

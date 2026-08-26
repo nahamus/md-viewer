@@ -183,6 +183,23 @@ export function useAppState() {
     [folderHandles, loadFolderContents],
   );
 
+  /** Re-scans and re-reads a connected folder source's files, to pick up changes made outside the app. */
+  const refreshFolderSource = useCallback(
+    async (id: string): Promise<{ ok: true } | { ok: false; error: string }> => {
+      const handle = folderHandles[id];
+      if (!handle || folderStatus[id] !== "connected") {
+        return { ok: false, error: "This folder isn't connected — click Reconnect." };
+      }
+      try {
+        await loadFolderContents(id, handle);
+      } catch (err) {
+        return { ok: false, error: (err as Error).message };
+      }
+      return { ok: true };
+    },
+    [folderHandles, folderStatus, loadFolderContents],
+  );
+
   /** Resolves a relative asset path (e.g. an image) referenced from a folder-source document. */
   const resolveFolderAsset = useCallback(
     async (sourceId: string, fromRelPath: string, assetPath: string): Promise<string | null> => {
@@ -607,6 +624,7 @@ export function useAppState() {
     folderStatus,
     addFolderSource,
     reconnectFolderSource,
+    refreshFolderSource,
     resolveFolderAsset,
 
     expandedKeys,

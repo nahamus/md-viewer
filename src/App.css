@@ -422,7 +422,8 @@ textarea:focus-visible {
   padding-right: calc(2 * (var(--tree-row-height) - 4px) + 12px);
 }
 
-.tree-item {
+.tree-item,
+.source-row-wrap {
   position: relative;
 }
 
@@ -439,7 +440,9 @@ textarea:focus-visible {
 }
 
 .tree-item:hover .tree-item-actions,
-.tree-item:focus-within .tree-item-actions {
+.tree-item:focus-within .tree-item-actions,
+.source-row-wrap:hover .tree-item-actions,
+.source-row-wrap:focus-within .tree-item-actions {
   opacity: 1;
   pointer-events: auto;
 }

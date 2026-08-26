@@ -118,25 +118,13 @@ export function SourceTree({
               className={`tree-row tree-row--file ${activeKey === fileKey ? "tree-row--active" : ""}`}
               style={{ paddingLeft: `${depth * 14 + 8}px` }}
               onClick={() => onOpenFile(source, child.relPath, child.name)}
-              onDoubleClick={() => onOpenFile(source, child.relPath, child.name, { pin: true })}
-              title="Click to preview, double-click to pin"
+              onDoubleClick={() => fileActions.onStartRename(source, child.relPath, child.name)}
+              title="Click to preview, double-click to rename"
             >
               <span className="tree-icon">📄</span>
               <span className="tree-label">{child.name}</span>
             </button>
             <div className="tree-item-actions">
-              <button
-                type="button"
-                className="tree-action-btn"
-                title="Rename"
-                aria-label="Rename"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  fileActions.onStartRename(source, child.relPath, child.name);
-                }}
-              >
-                ✎
-              </button>
               <button
                 type="button"
                 className="tree-action-btn"
