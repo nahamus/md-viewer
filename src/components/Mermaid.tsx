@@ -1,26 +1,50 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { getMermaidThemeVersionSnapshot, subscribeMermaidThemeVersion } from "../lib/mermaidTheme";
 import { Lightbox } from "./Lightbox";
 
 const ZOOM_STEP = 0.25;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3;
 
-const prefersDark = typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+// Mermaid's own theme is baked in once at initialize() (below) and cached
+// for the session — it won't live-update if the user toggles the theme
+// later, same limitation this already had with the OS-level dark mode
+// setting. Reading the resolved data-theme attribute (rather than the
+// profile's raw preference) means this doesn't need to know anything about
+// profiles/storage — it just reflects whatever index.css is actually
+// rendering with, "system" included.
+function resolvePrefersDark(): boolean {
+  const override = document.documentElement.dataset.theme;
+  if (override === "light") return false;
+  if (override === "dark") return true;
+  return typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
 
 // mermaid (plus the diagram-type chunks it pulls in) is sizeable, so only
 // fetch it the first time a document actually needs to render a diagram.
+// Computing the theme lazily here (rather than at module scope) matters:
+// this module loads as part of the initial bundle evaluation, before React
+// has mounted and applied data-theme to <html> — reading it too early would
+// always see the pre-mount default instead of the profile's actual choice.
 let mermaidPromise: Promise<typeof import("mermaid")> | null = null;
 function loadMermaid() {
   mermaidPromise ??= import("mermaid").then((mod) => {
     mod.default.initialize({
       startOnLoad: false,
       securityLevel: "strict",
-      theme: prefersDark ? "dark" : "default",
+      theme: resolvePrefersDark() ? "dark" : "default",
     });
     return mod;
   });
   return mermaidPromise;
 }
+
+// Invalidate the cached init as soon as the active theme changes (see
+// lib/mermaidTheme) — registered once at module scope, not tied to any one
+// <Mermaid> instance's lifecycle, since the cache itself isn't either.
+subscribeMermaidThemeVersion(() => {
+  mermaidPromise = null;
+});
 
 /**
  * mermaid always emits its root <svg> as `width="100%" style="max-width:
@@ -53,7 +77,12 @@ interface Props {
 /** Callers should render this with `key={chart}` so an edited diagram remounts fresh. */
 export function Mermaid({ chart }: Props) {
   const rawId = useId();
-  const id = `mermaid-${rawId.replace(/[^a-zA-Z0-9]/g, "")}`;
+  // Folding the theme version into the id (rather than just adding it to the
+  // effect's deps) gives mermaid.render() a genuinely new id on every theme
+  // change, rather than calling it twice for the same id — mermaid's id
+  // tracking for a given render is meant for one-shot use.
+  const themeVersion = useSyncExternalStore(subscribeMermaidThemeVersion, getMermaidThemeVersionSnapshot);
+  const id = `mermaid-${rawId.replace(/[^a-zA-Z0-9]/g, "")}-${themeVersion}`;
   const [svg, setSvg] = useState<string | null>(null);
   const [naturalWidth, setNaturalWidth] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);

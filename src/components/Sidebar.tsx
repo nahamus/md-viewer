@@ -3,7 +3,10 @@ import { computeRenameTarget } from "../lib/rename";
 import { buildTree } from "../lib/tree";
 import { displayPath, parseDocKey, type FileOpResult, type FolderStatus, type Source } from "../types";
 import { ChevronIcon } from "./ChevronIcon";
+import { CollapseIcon } from "./CollapseIcon";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { RefreshIcon } from "./RefreshIcon";
+import { SearchIcon } from "./SearchIcon";
 import { SourceTree } from "./SourceTree";
 
 const MIN_SIDEBAR_WIDTH = 180;
@@ -154,10 +157,10 @@ export function Sidebar({
         <span className="sidebar-title">Documents</span>
         <div className="sidebar-header-actions">
           <button type="button" className="icon-btn" title="Collapse all" onClick={onCollapseAll}>
-            ⊟
+            <CollapseIcon />
           </button>
           <button type="button" className="icon-btn" title="Search all documents" onClick={onOpenSearch}>
-            🔍
+            <SearchIcon />
           </button>
         </div>
       </div>
@@ -203,7 +206,7 @@ export function Sidebar({
                         if (!result.ok) setRefreshError({ id: source.id, message: result.error });
                       }}
                     >
-                      🔄
+                      <RefreshIcon />
                     </button>
                   </div>
                 )}

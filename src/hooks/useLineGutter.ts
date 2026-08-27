@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 /**
  * Shared line-wrap-aware gutter plumbing for a plain <textarea>.
@@ -17,6 +17,7 @@ export function useLineGutter(content: string, textareaRef: RefObject<HTMLTextAr
   const mirrorRef = useRef<HTMLDivElement>(null);
   const lines = content.split("\n");
   const [lineHeights, setLineHeights] = useState<number[]>([]);
+  const measureRef = useRef(() => {});
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
@@ -29,12 +30,13 @@ export function useLineGutter(content: string, textareaRef: RefObject<HTMLTextAr
       mirror.replaceChildren(
         ...lines.map((line) => {
           const row = document.createElement("div");
-          row.textContent = line.length > 0 ? line : " ";
+          row.textContent = line.length > 0 ? line : " ";
           return row;
         }),
       );
       setLineHeights(Array.from(mirror.children, (child) => child.getBoundingClientRect().height));
     }
+    measureRef.current = measure;
 
     measure();
     const observer = new ResizeObserver(measure);
@@ -43,6 +45,27 @@ export function useLineGutter(content: string, textareaRef: RefObject<HTMLTextAr
     // `lines` is re-derived from `content` every render, so `content` alone covers it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, textareaRef]);
+
+  // The very first measurement above, right when the editor first mounts on
+  // a cold page load specifically (not a later view->edit toggle in an
+  // already-running session), has been seen to come out wrong in a way a
+  // plain content edit then fixes just by re-running that same effect —
+  // some layout detail isn't settled yet at that exact point, even inside
+  // useLayoutEffect. Rather than chase the precise cause (Vite's dev server
+  // injects CSS via JS asynchronously on first load, unlike a production
+  // build's blocking stylesheet, which is the most likely culprit), retry
+  // across the next several frames once per mount — cheap, and a no-op if
+  // the first measurement was already correct.
+  useEffect(() => {
+    let remaining = 5;
+    let rafId: number;
+    function tick() {
+      measureRef.current();
+      if (remaining-- > 0) rafId = requestAnimationFrame(tick);
+    }
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
 
   function syncGutterScroll(scrollTop: number) {
     if (gutterRef.current) gutterRef.current.scrollTop = scrollTop;

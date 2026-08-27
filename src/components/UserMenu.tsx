@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { useClickOutside } from "../hooks/useClickOutside";
 import type { UserProfile } from "../types";
+import { DeleteIcon } from "./DeleteIcon";
+import { EditIcon } from "./EditIcon";
 
 interface Props {
   users: UserProfile[];
@@ -57,11 +59,11 @@ export function UserMenu({ users, currentUserId, onSwitch, onRequestCreate, onRe
                 </button>
                 <div className="user-list-actions">
                   <button type="button" title="Edit profile" onClick={() => onRequestEdit(user)}>
-                    ✎
+                    <EditIcon size={12} />
                   </button>
                   {users.length > 1 && (
                     <button type="button" title="Delete profile" onClick={() => onDelete(user.id, user.name)}>
-                      🗑
+                      <DeleteIcon size={12} />
                     </button>
                   )}
                 </div>

@@ -15,6 +15,9 @@ export interface Source {
 /** Live (per-session) connection state of a "folder" source. */
 export type FolderStatus = "connecting" | "connected" | "disconnected" | "unsupported";
 
+/** "system" follows prefers-color-scheme; the others force a specific theme regardless of it. */
+export type ThemePreference = "system" | "light" | "dark";
+
 /** A source's path is only worth displaying alongside its name if it says something new. */
 export function displayPath(source: Source): string | undefined {
   return source.path && source.path !== source.name ? source.path : undefined;
@@ -34,6 +37,8 @@ export interface UserProfile {
   label?: string;
   /** A single emoji representing this profile. */
   avatar?: string;
+  /** "system" (default) follows prefers-color-scheme; the others force a specific theme regardless of it. */
+  theme?: ThemePreference;
 }
 
 /** Everything one profile owns, persisted as a single localStorage entry. */

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useEscapeKey } from "../hooks/useEscapeKey";
 import { searchDocs } from "../lib/search";
 import type { Source } from "../types";
+import { SearchIcon } from "./SearchIcon";
 
 interface Props {
   sources: Source[];
@@ -44,7 +45,9 @@ export function SearchDialog({ sources, docs, onOpen, onClose }: Props) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal--search" onClick={(e) => e.stopPropagation()}>
         <div className="search-input-row">
-          <span className="search-icon">🔍</span>
+          <span className="search-icon">
+            <SearchIcon size={16} />
+          </span>
           <input
             autoFocus
             className="search-input"

@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { useEscapeKey } from "../hooks/useEscapeKey";
 import { isBraveBrowser } from "../lib/folderSource";
-import { displayPath, type FolderStatus, type Source } from "../types";
+import { displayPath, type FileOpResult, type FolderStatus, type Source } from "../types";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { DeleteIcon } from "./DeleteIcon";
+import { EditIcon } from "./EditIcon";
 
 interface Props {
   sources: Source[];
   folderSourcesSupported: boolean;
   folderStatus: Record<string, FolderStatus>;
-  onAdd: (name: string, path?: string) => void;
-  onAddFolder: () => Promise<{ ok: true } | { ok: false; error: string }>;
+  onAdd: (name: string, path?: string) => FileOpResult;
+  onAddFolder: () => Promise<FileOpResult>;
   onUpdate: (id: string, updates: { name: string; path?: string }) => void;
   onRemove: (id: string) => void;
-  onReconnect: (id: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  onReconnect: (id: string) => Promise<FileOpResult>;
   onClose: () => void;
 }
 
@@ -35,6 +37,7 @@ export function SourceDialog({
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [folderError, setFolderError] = useState<string | null>(null);
   const [addingFolder, setAddingFolder] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   // Only close this dialog on Escape if the nested remove-confirmation isn't
   // covering it (that dialog handles Escape itself, both listeners are global).
@@ -46,7 +49,12 @@ export function SourceDialog({
     e.preventDefault();
     const name = newName.trim();
     if (!name) return;
-    onAdd(name, newPath.trim() || undefined);
+    const result = onAdd(name, newPath.trim() || undefined);
+    if (!result.ok) {
+      setAddError(result.error);
+      return;
+    }
+    setAddError(null);
     setNewName("");
     setNewPath("");
   }
@@ -160,10 +168,10 @@ export function SourceDialog({
                     {editingId !== source.id && (
                       <div className="source-list-actions">
                         <button type="button" onClick={() => startEdit(source)} title="Edit">
-                          ✎
+                          <EditIcon />
                         </button>
                         <button type="button" onClick={() => setRemovingId(source.id)} title="Remove">
-                          🗑
+                          <DeleteIcon />
                         </button>
                       </div>
                     )}
@@ -210,6 +218,7 @@ export function SourceDialog({
                     placeholder="~/notes/work"
                   />
                 </label>
+                {addError && <p className="form-error">{addError}</p>}
                 <button type="submit" className="secondary-btn">
                   Add virtual source (no real files)
                 </button>

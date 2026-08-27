@@ -1,20 +1,26 @@
 import { useState } from "react";
 import { useEscapeKey } from "../hooks/useEscapeKey";
-import type { UserProfile } from "../types";
+import type { ThemePreference, UserProfile } from "../types";
 
 interface Props {
   title: string;
-  initial?: Partial<Pick<UserProfile, "name" | "label" | "avatar">>;
-  onSave: (profile: { name: string; label?: string; avatar?: string }) => void;
+  initial?: Partial<Pick<UserProfile, "name" | "label" | "avatar" | "theme">>;
+  onSave: (profile: { name: string; label?: string; avatar?: string; theme?: ThemePreference }) => void;
   onClose: () => void;
 }
 
 const AVATAR_PRESETS = ["👤", "🦊", "🐱", "🐼", "🐸", "🦉", "🐙", "🌟", "🎨", "📚", "🚀", "☕"];
+const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
 
 export function ProfileDialog({ title, initial, onSave, onClose }: Props) {
   const [name, setName] = useState(initial?.name ?? "");
   const [label, setLabel] = useState(initial?.label ?? "");
   const [avatar, setAvatar] = useState(initial?.avatar ?? "");
+  const [theme, setTheme] = useState<ThemePreference>(initial?.theme ?? "system");
 
   useEscapeKey(onClose);
 
@@ -22,7 +28,7 @@ export function ProfileDialog({ title, initial, onSave, onClose }: Props) {
     e.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) return;
-    onSave({ name: trimmedName, label: label.trim() || undefined, avatar: avatar.trim() || undefined });
+    onSave({ name: trimmedName, label: label.trim() || undefined, avatar: avatar.trim() || undefined, theme });
     onClose();
   }
 
@@ -71,6 +77,22 @@ export function ProfileDialog({ title, initial, onSave, onClose }: Props) {
                   {emoji}
                 </button>
               ))}
+            </div>
+            {/* Not a <label> — there's no single input to associate one with, just a row of buttons. */}
+            <div className="field-group">
+              <span>Theme</span>
+              <div className="theme-presets">
+                {THEME_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`theme-preset ${theme === opt.value ? "theme-preset--active" : ""}`}
+                    onClick={() => setTheme(opt.value)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
             <button type="submit" className="primary-btn">
               Save

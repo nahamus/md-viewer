@@ -10,6 +10,7 @@ import { Sidebar } from "./components/Sidebar";
 import { SourceDialog } from "./components/SourceDialog";
 import { TabBar } from "./components/TabBar";
 import { UserMenu } from "./components/UserMenu";
+import { useApplyTheme } from "./hooks/useTheme";
 import { modKeyLabel } from "./lib/platform";
 import { useAppState } from "./state/useAppState";
 import type { UserProfile } from "./types";
@@ -27,6 +28,8 @@ type ProfileDialogState = { mode: "create" } | { mode: "edit"; user: UserProfile
 function App() {
   const state = useAppState();
   const { docs, isDirty, saveDoc, setSidebarVisible, setSearchDialogOpen } = state;
+  const currentUser = state.users.find((u) => u.id === state.currentUserId);
+  useApplyTheme(currentUser?.theme ?? "system");
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [profileDialog, setProfileDialog] = useState<ProfileDialogState>(null);
 

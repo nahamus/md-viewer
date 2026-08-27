@@ -1,12 +1,15 @@
-import { isValidElement, useCallback, useMemo } from "react";
+import { isValidElement, useCallback, useEffect, useMemo, useRef } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { extractHeadings } from "../lib/headings";
 import { modKeyLabel } from "../lib/platform";
 import type { DocMode, DocUiState, OpenDoc } from "../types";
 import { CodeBlock } from "./CodeBlock";
+import { EditIcon } from "./EditIcon";
 import { EditorView } from "./EditorView";
 import { MarkdownImage } from "./MarkdownImage";
 import { Mermaid } from "./Mermaid";
+import { OutlinePanel } from "./OutlinePanel";
 
 function isMermaidCodeElement(node: unknown): boolean {
   if (!isValidElement(node)) return false;
@@ -40,10 +43,36 @@ export function DocumentPane({
   const isEditing = ui.mode === "edit";
   const dirty = isEditing && ui.draft !== content;
 
+  const headings = useMemo(() => extractHeadings(content), [content]);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // react-markdown doesn't add heading ids itself. Assigning them via a
+  // custom h1..h6 `components` override would need a counter shared across
+  // those render calls to match each heading to its slug by position — but
+  // mutating a ref during render like that is exactly what React warns
+  // against (a parent re-render doesn't guarantee children re-run in the
+  // same order/count if anything upstream changes). Doing it here instead,
+  // against the already-rendered DOM, sidesteps that: querySelectorAll
+  // returns headings in the same document order extractHeadings used, so
+  // matching by index is safe post-render even though it wouldn't be during it.
+  useEffect(() => {
+    const container = contentRef.current;
+    if (!container) return;
+    const elements = container.querySelectorAll("h1, h2, h3, h4, h5, h6");
+    elements.forEach((el, i) => {
+      const id = headings[i]?.id;
+      if (id) el.id = id;
+    });
+  }, [headings, ui.mode]);
+
   const resolveAsset = useCallback(
     (assetPath: string) => onResolveAsset(doc.sourceId, doc.relPath, assetPath),
     [doc.sourceId, doc.relPath, onResolveAsset],
   );
+
+  function jumpToHeading(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   const markdownComponents = useMemo<Components>(
     () => ({
@@ -102,15 +131,18 @@ export function DocumentPane({
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              className="icon-action-btn"
-              onClick={() => onSetMode("edit")}
-              title="Edit"
-              aria-label="Edit"
-            >
-              ✎
-            </button>
+            <>
+              <OutlinePanel headings={headings} onJump={jumpToHeading} />
+              <button
+                type="button"
+                className="icon-action-btn"
+                onClick={() => onSetMode("edit")}
+                title="Edit"
+                aria-label="Edit"
+              >
+                <EditIcon />
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -118,7 +150,7 @@ export function DocumentPane({
       <div className="document-content">
         {ui.error && <p className="form-error">{ui.error}</p>}
         {ui.mode === "view" && (
-          <div className="markdown-body">
+          <div className="markdown-body" ref={contentRef}>
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
               {content}
             </ReactMarkdown>

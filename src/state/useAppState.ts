@@ -6,6 +6,7 @@ import {
   docKey,
   type DocMode,
   type DocUiState,
+  type FileOpResult,
   type FolderStatus,
   type OpenDoc,
   type UserData,
@@ -132,7 +133,7 @@ export function useAppState() {
     };
   }, [currentUserId, loadFolderContents]);
 
-  const addFolderSource = useCallback(async (): Promise<{ ok: true } | { ok: false; error: string }> => {
+  const addFolderSource = useCallback(async (): Promise<FileOpResult> => {
     if (!folderSource.folderSourcesSupported) {
       const error = folderSource.isBraveBrowser
         ? "Enable brave://flags/#file-system-access-api and relaunch Brave, or add a virtual source instead."
@@ -146,6 +147,18 @@ export function useAppState() {
       if ((err as Error).name === "AbortError") return { ok: true };
       return { ok: false, error: (err as Error).message };
     }
+
+    // The picker gives no stable path to compare against — isSameEntry is
+    // the only reliable way to tell "the same folder, picked again" from
+    // "a different folder that happens to share a name".
+    for (const existing of userData.sources) {
+      if (existing.kind !== "folder") continue;
+      const existingHandle = folderHandles[existing.id] ?? (await handles.loadHandle(existing.id));
+      if (existingHandle && (await handle.isSameEntry(existingHandle))) {
+        return { ok: false, error: `This folder is already added as "${existing.name}".` };
+      }
+    }
+
     // Don't default path to the folder's name — it's identical to the label
     // above it and would just show the same text twice in the sidebar.
     const source = storage.addSource(currentUserId, handle.name, undefined, "folder");
@@ -159,7 +172,7 @@ export function useAppState() {
     }
     setFolderStatus((prev) => ({ ...prev, [source.id]: "connected" }));
     return { ok: true };
-  }, [currentUserId, refreshUserData, loadFolderContents]);
+  }, [currentUserId, refreshUserData, loadFolderContents, userData.sources, folderHandles]);
 
   const reconnectFolderSource = useCallback(
     async (id: string): Promise<{ ok: true } | { ok: false; error: string }> => {
@@ -273,11 +286,17 @@ export function useAppState() {
   // --- Sources ---
 
   const addSource = useCallback(
-    (name: string, path?: string) => {
-      storage.addSource(currentUserId, name, path);
+    (name: string, path?: string): FileOpResult => {
+      const trimmed = name.trim();
+      const isDuplicate = userData.sources.some(
+        (s) => s.kind !== "folder" && s.name.trim().toLowerCase() === trimmed.toLowerCase(),
+      );
+      if (isDuplicate) return { ok: false, error: `A source named "${trimmed}" already exists.` };
+      storage.addSource(currentUserId, trimmed, path);
       refreshUserData();
+      return { ok: true };
     },
-    [currentUserId, refreshUserData],
+    [currentUserId, refreshUserData, userData.sources],
   );
 
   const updateSource = useCallback(

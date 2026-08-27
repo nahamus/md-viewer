@@ -1,5 +1,6 @@
 import { docKey, type Source, type TreeNode } from "../types";
 import { ChevronIcon } from "./ChevronIcon";
+import { DeleteIcon } from "./DeleteIcon";
 
 export interface FileActions {
   renamingKey: string | null;
@@ -135,7 +136,7 @@ export function SourceTree({
                   fileActions.onRequestDelete(source, child.relPath, child.name);
                 }}
               >
-                🗑
+                <DeleteIcon size={12} />
               </button>
             </div>
           </li>
