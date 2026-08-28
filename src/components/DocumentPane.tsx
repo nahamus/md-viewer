@@ -1,15 +1,16 @@
-import { isValidElement, useCallback, useEffect, useMemo, useRef } from "react";
+import { isValidElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { extractHeadings } from "../lib/headings";
 import { modKeyLabel } from "../lib/platform";
-import type { DocMode, DocUiState, OpenDoc } from "../types";
+import type { DocMode, DocUiState, FileOpResult, OpenDoc } from "../types";
 import { CodeBlock } from "./CodeBlock";
 import { EditIcon } from "./EditIcon";
 import { EditorView } from "./EditorView";
 import { MarkdownImage } from "./MarkdownImage";
 import { Mermaid } from "./Mermaid";
 import { OutlinePanel } from "./OutlinePanel";
+import { RefreshIcon } from "./RefreshIcon";
 
 function isMermaidCodeElement(node: unknown): boolean {
   if (!isValidElement(node)) return false;
@@ -27,6 +28,7 @@ interface Props {
   onSave: () => void;
   onCancel: () => void;
   onResolveAsset: (sourceId: string, fromRelPath: string, assetPath: string) => Promise<string | null>;
+  onRefresh: () => Promise<FileOpResult>;
 }
 
 export function DocumentPane({
@@ -39,12 +41,31 @@ export function DocumentPane({
   onSave,
   onCancel,
   onResolveAsset,
+  onRefresh,
 }: Props) {
   const isEditing = ui.mode === "edit";
   const dirty = isEditing && ui.draft !== content;
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [refreshErrorKey, setRefreshErrorKey] = useState(doc.key);
+
+  // A doc switch/rename means any stale refresh error belongs to a different
+  // file — clear it during render (not an effect) to avoid an extra render.
+  if (refreshErrorKey !== doc.key) {
+    setRefreshErrorKey(doc.key);
+    setRefreshError(null);
+  }
 
   const headings = useMemo(() => extractHeadings(content), [content]);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    setRefreshError(null);
+    const result = await onRefresh();
+    setRefreshing(false);
+    if (!result.ok) setRefreshError(result.error);
+  }
 
   // react-markdown doesn't add heading ids itself. Assigning them via a
   // custom h1..h6 `components` override would need a counter shared across
@@ -132,6 +153,18 @@ export function DocumentPane({
             </>
           ) : (
             <>
+              {isFolderDoc && (
+                <button
+                  type="button"
+                  className="icon-action-btn"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  title="Refresh this document (pick up changes made outside the app)"
+                  aria-label="Refresh"
+                >
+                  {refreshing ? <span className="spinner" /> : <RefreshIcon />}
+                </button>
+              )}
               <OutlinePanel headings={headings} onJump={jumpToHeading} />
               <button
                 type="button"
@@ -149,6 +182,7 @@ export function DocumentPane({
 
       <div className="document-content">
         {ui.error && <p className="form-error">{ui.error}</p>}
+        {refreshError && <p className="form-error">{refreshError}</p>}
         {ui.mode === "view" && (
           <div className="markdown-body" ref={contentRef}>
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>

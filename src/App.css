@@ -720,6 +720,12 @@ textarea:focus-visible {
      max-width instead of truncating. */
   width: 100%;
   min-width: 0;
+  /* Other buttons in this app (.icon-action-btn, .tree-action-btn, ...) all
+     center their content via flex instead of relying on line-height, since
+     these are <button> elements and line-height-based centering here was
+     sitting text low in its box with the top clipped by overflow: hidden. */
+  display: flex;
+  align-items: center;
   text-align: left;
   background: none;
   border: none;
@@ -727,6 +733,7 @@ textarea:focus-visible {
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
+  line-height: 1.4;
   color: var(--text-h);
   overflow: hidden;
   text-overflow: ellipsis;

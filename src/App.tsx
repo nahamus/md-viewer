@@ -247,6 +247,7 @@ function App() {
               onSave={() => state.saveDoc(activeDoc)}
               onCancel={() => requestCancelEdit(activeDoc.key)}
               onResolveAsset={state.resolveFolderAsset}
+              onRefresh={() => state.refreshDoc(activeDoc.sourceId, activeDoc.relPath)}
             />
           ) : (
             <div className="empty-state">

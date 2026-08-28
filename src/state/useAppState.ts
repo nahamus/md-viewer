@@ -213,6 +213,28 @@ export function useAppState() {
     [folderHandles, folderStatus, loadFolderContents],
   );
 
+  /** Re-reads a single folder-source document from disk, to pick up an external change without rescanning the whole tree. */
+  const refreshDoc = useCallback(
+    async (sourceId: string, relPath: string): Promise<FileOpResult> => {
+      const source = userData.sources.find((s) => s.id === sourceId);
+      // Virtual sources live entirely in this browser's storage — there's no
+      // external copy to have drifted, so there's nothing to refresh.
+      if (source?.kind !== "folder") return { ok: true };
+      const handle = folderHandles[sourceId];
+      if (!handle || folderStatus[sourceId] !== "connected") {
+        return { ok: false, error: "This folder isn't connected — click Reconnect in the sidebar." };
+      }
+      try {
+        const content = await folderSource.readMdFile(handle, relPath);
+        setFolderDocs((prev) => ({ ...prev, [docKey(sourceId, relPath)]: content }));
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, error: (err as Error).message };
+      }
+    },
+    [userData.sources, folderHandles, folderStatus],
+  );
+
   /** Resolves a relative asset path (e.g. an image) referenced from a folder-source document. */
   const resolveFolderAsset = useCallback(
     async (sourceId: string, fromRelPath: string, assetPath: string): Promise<string | null> => {
@@ -644,6 +666,7 @@ export function useAppState() {
     addFolderSource,
     reconnectFolderSource,
     refreshFolderSource,
+    refreshDoc,
     resolveFolderAsset,
 
     expandedKeys,
