@@ -1,0 +1,17 @@
+{
+  "name": "md-viewer",
+  "short_name": "md-viewer",
+  "description": "A quick, no-frills markdown document viewer",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#aa3bff",
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }],
+  "file_handlers": [
+    {
+      "action": "./",
+      "accept": { "text/markdown": [".md", ".markdown"] }
+    }
+  ]
+}

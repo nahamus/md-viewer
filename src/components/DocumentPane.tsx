@@ -23,6 +23,11 @@ interface Props {
   content: string;
   ui: DocUiState;
   isFolderDoc: boolean;
+  /** Show the per-document Refresh button. Usually mirrors isFolderDoc, but a
+   * launched loose file (see useLaunchedFile) can refresh without being a
+   * folder-source doc — it has no directory context for asset resolution,
+   * which is what isFolderDoc otherwise gates. */
+  showRefresh: boolean;
   onSetMode: (mode: DocMode) => void;
   onDraftChange: (value: string) => void;
   onSave: () => void;
@@ -36,6 +41,7 @@ export function DocumentPane({
   content,
   ui,
   isFolderDoc,
+  showRefresh,
   onSetMode,
   onDraftChange,
   onSave,
@@ -153,7 +159,7 @@ export function DocumentPane({
             </>
           ) : (
             <>
-              {isFolderDoc && (
+              {showRefresh && (
                 <button
                   type="button"
                   className="icon-action-btn"

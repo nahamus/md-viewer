@@ -11,6 +11,7 @@ import { SourceDialog } from "./components/SourceDialog";
 import { TabBar } from "./components/TabBar";
 import { UserMenu } from "./components/UserMenu";
 import { useApplyTheme } from "./hooks/useTheme";
+import { useLaunchedFile } from "./hooks/useLaunchedFile";
 import { modKeyLabel } from "./lib/platform";
 import { useAppState } from "./state/useAppState";
 import type { UserProfile } from "./types";
@@ -30,8 +31,36 @@ function App() {
   const { docs, isDirty, saveDoc, setSidebarVisible, setSearchDialogOpen } = state;
   const currentUser = state.users.find((u) => u.id === state.currentUserId);
   useApplyTheme(currentUser?.theme ?? "system");
+  const launched = useLaunchedFile();
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [profileDialog, setProfileDialog] = useState<ProfileDialogState>(null);
+
+  // A file opened from the OS (see useLaunchedFile) takes over the main pane
+  // until closed — switching to a sidebar/tab/search doc implicitly closes
+  // it first, with the same discard-confirmation every other transition in
+  // this app already applies to unsaved edits.
+  function runAfterClosingLaunchedFile(action: () => void) {
+    if (!launched.file) {
+      action();
+      return;
+    }
+    const dirty = launched.file.mode === "edit" && launched.file.draft !== launched.file.content;
+    if (!dirty) {
+      launched.close();
+      action();
+      return;
+    }
+    setConfirmRequest({
+      title: "Discard changes?",
+      message: "This document has unsaved edits. Closing it will discard them.",
+      confirmLabel: "Discard",
+      danger: true,
+      onConfirm: () => {
+        launched.close();
+        action();
+      },
+    });
+  }
 
   const dirtyKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -116,9 +145,13 @@ function App() {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const mod = e.metaKey || e.ctrlKey;
+      const launchedDirty =
+        launched.file?.mode === "edit" && launched.file.draft !== launched.file.content;
       if (mod && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        if (activeDoc && activeDocUi?.mode === "edit" && activeDocUi.draft !== activeContent) {
+        if (launchedDirty) {
+          launched.save();
+        } else if (activeDoc && activeDocUi?.mode === "edit" && activeDocUi.draft !== activeContent) {
           saveDoc(activeDoc);
         }
       } else if (mod && e.key.toLowerCase() === "b") {
@@ -127,6 +160,8 @@ function App() {
       } else if (mod && e.key.toLowerCase() === "p" && !anyModalOpen) {
         e.preventDefault();
         setSearchDialogOpen(true);
+      } else if (e.key === "Escape" && !anyModalOpen && launched.file?.mode === "edit") {
+        launched.cancel();
       } else if (e.key === "Escape" && !anyModalOpen && activeDoc && activeDocUi?.mode === "edit") {
         requestCancelEdit(activeDoc.key);
       }
@@ -149,6 +184,9 @@ function App() {
     setSearchDialogOpen,
     isDirty,
     state.cancelEdit,
+    launched.file?.mode,
+    launched.file?.draft,
+    launched.file?.content,
   ]);
 
   // Warn before closing/reloading the tab with unsaved edits — otherwise
@@ -156,14 +194,16 @@ function App() {
   // or switching profiles, which already confirm).
   useEffect(() => {
     function handleBeforeUnload(e: BeforeUnloadEvent) {
-      if (dirtyKeys.size > 0) {
+      const launchedDirty =
+        launched.file?.mode === "edit" && launched.file.draft !== launched.file.content;
+      if (dirtyKeys.size > 0 || launchedDirty) {
         e.preventDefault();
         e.returnValue = "";
       }
     }
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [dirtyKeys]);
+  }, [dirtyKeys, launched.file]);
 
   return (
     <div className="app-shell">
@@ -214,7 +254,9 @@ function App() {
             onWidthChange={state.setSidebarWidth}
             onToggleExpand={state.toggleExpand}
             onCollapseAll={state.collapseAll}
-            onOpenFile={state.openDoc}
+            onOpenFile={(source, relPath, name, opts) =>
+              runAfterClosingLaunchedFile(() => state.openDoc(source, relPath, name, opts))
+            }
             onOpenSearch={() => state.setSearchDialogOpen(true)}
             onReconnect={state.reconnectFolderSource}
             onRefreshFolder={state.refreshFolderSource}
@@ -229,19 +271,57 @@ function App() {
             previewTab={state.previewTab}
             activeKey={state.activeKey}
             dirtyKeys={dirtyKeys}
-            onActivate={state.setActiveKey}
+            onActivate={(key) => runAfterClosingLaunchedFile(() => state.setActiveKey(key))}
             onClose={requestCloseTab}
             onPin={state.pinTab}
             onUnpin={state.unpinTab}
             onRename={state.renameDoc}
           />
 
-          {activeDoc && activeDocUi ? (
+          {launched.file ? (
+            <>
+              <div className="launched-file-banner">
+                <span>Opened "{launched.file.name}" from your computer — not added to any source.</span>
+                <button type="button" className="link-btn" onClick={() => runAfterClosingLaunchedFile(() => {})}>
+                  Close
+                </button>
+              </div>
+              <DocumentPane
+                doc={{
+                  key: "launched-file",
+                  sourceId: "launched",
+                  sourceName: "Opened from your computer",
+                  relPath: launched.file.name,
+                  name: launched.file.name,
+                  pinned: false,
+                }}
+                content={launched.file.content}
+                ui={{
+                  mode: launched.file.mode,
+                  draft: launched.file.draft,
+                  saving: launched.file.saving,
+                  error: launched.file.error,
+                }}
+                isFolderDoc={false}
+                showRefresh
+                onSetMode={launched.setMode}
+                onDraftChange={launched.setDraft}
+                onSave={launched.save}
+                onCancel={launched.cancel}
+                onResolveAsset={async () => null}
+                onRefresh={async () => {
+                  await launched.refresh();
+                  return { ok: true } as const;
+                }}
+              />
+            </>
+          ) : activeDoc && activeDocUi ? (
             <DocumentPane
               doc={activeDoc}
               content={activeContent}
               ui={activeDocUi}
               isFolderDoc={isFolderDoc}
+              showRefresh={isFolderDoc}
               onSetMode={(mode) => state.setMode(activeDoc.key, mode)}
               onDraftChange={(value) => state.setDraft(activeDoc.key, value)}
               onSave={() => state.saveDoc(activeDoc)}
@@ -278,7 +358,7 @@ function App() {
           onClose={() => state.setNewFileDialogOpen(false)}
           onCreated={(source, relPath, name) => {
             state.setNewFileDialogOpen(false);
-            state.openDoc(source, relPath, name, { pin: true, mode: "edit" });
+            runAfterClosingLaunchedFile(() => state.openDoc(source, relPath, name, { pin: true, mode: "edit" }));
             if (!state.expandedKeys.has(`${source.id}::`)) {
               state.toggleExpand(`${source.id}::`);
             }
@@ -290,7 +370,9 @@ function App() {
         <SearchDialog
           sources={state.sources}
           docs={docs}
-          onOpen={(source, relPath, name) => state.openDoc(source, relPath, name, { pin: true })}
+          onOpen={(source, relPath, name) =>
+            runAfterClosingLaunchedFile(() => state.openDoc(source, relPath, name, { pin: true }))
+          }
           onClose={() => state.setSearchDialogOpen(false)}
         />
       )}
