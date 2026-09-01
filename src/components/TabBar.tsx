@@ -11,6 +11,7 @@ interface Props {
   onClose: (key: string) => void;
   onPin: (key: string) => void;
   onUnpin: (key: string) => void;
+  onReorder: (fromKey: string, toKey: string) => void;
   onRename: (sourceId: string, relPath: string, newRelPath: string, newName: string) => Promise<FileOpResult>;
 }
 
@@ -20,6 +21,9 @@ function Tab({
   isPreview,
   isDirty,
   isRenaming,
+  isDraggable,
+  isDragging,
+  isDragOver,
   renameValue,
   renameError,
   onRenameValueChange,
@@ -30,12 +34,19 @@ function Tab({
   onClose,
   onPin,
   onUnpin,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }: {
   doc: OpenDoc;
   isActive: boolean;
   isPreview: boolean;
   isDirty: boolean;
   isRenaming: boolean;
+  isDraggable: boolean;
+  isDragging: boolean;
+  isDragOver: boolean;
   renameValue: string;
   renameError: string | null;
   onRenameValueChange: (value: string) => void;
@@ -46,6 +57,10 @@ function Tab({
   onClose: () => void;
   onPin: () => void;
   onUnpin: () => void;
+  onDragStart: () => void;
+  onDragOver: () => void;
+  onDrop: () => void;
+  onDragEnd: () => void;
 }) {
   if (isRenaming) {
     return (
@@ -77,9 +92,29 @@ function Tab({
 
   return (
     <div
-      className={`tab ${isActive ? "tab--active" : ""} ${isPreview ? "tab--preview" : ""}`}
+      className={`tab ${isActive ? "tab--active" : ""} ${isPreview ? "tab--preview" : ""} ${
+        isDragging ? "tab--dragging" : ""
+      } ${isDragOver ? "tab--drag-over" : ""}`}
+      draggable={isDraggable}
       onClick={onActivate}
       onDoubleClick={onStartRename}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        // Firefox needs data set for a drag to start at all.
+        e.dataTransfer.setData("text/plain", doc.key);
+        onDragStart();
+      }}
+      onDragOver={(e) => {
+        if (!isDraggable) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        onDragOver();
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop();
+      }}
+      onDragEnd={onDragEnd}
       title={doc.sourceName + " / " + doc.relPath}
     >
       <button
@@ -113,12 +148,30 @@ function Tab({
   );
 }
 
-export function TabBar({ pinnedTabs, previewTab, activeKey, dirtyKeys, onActivate, onClose, onPin, onUnpin, onRename }: Props) {
+export function TabBar({
+  pinnedTabs,
+  previewTab,
+  activeKey,
+  dirtyKeys,
+  onActivate,
+  onClose,
+  onPin,
+  onUnpin,
+  onReorder,
+  onRename,
+}: Props) {
   const [renaming, setRenaming] = useState<{ doc: OpenDoc; value: string } | null>(null);
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
 
   if (pinnedTabs.length === 0 && !previewTab) {
     return null;
+  }
+
+  function endDrag() {
+    setDragKey(null);
+    setDragOverKey(null);
   }
 
   async function commitRename() {
@@ -138,6 +191,9 @@ export function TabBar({ pinnedTabs, previewTab, activeKey, dirtyKeys, onActivat
   }
 
   function renderTab(doc: OpenDoc, isPreview: boolean) {
+    // Only pinned tabs reorder; the preview tab is always the trailing slot.
+    // Dragging is disabled entirely while a rename is in progress.
+    const isDraggable = !isPreview && !renaming;
     return (
       <Tab
         key={doc.key}
@@ -146,6 +202,9 @@ export function TabBar({ pinnedTabs, previewTab, activeKey, dirtyKeys, onActivat
         isPreview={isPreview}
         isDirty={dirtyKeys.has(doc.key)}
         isRenaming={renaming?.doc.key === doc.key}
+        isDraggable={isDraggable}
+        isDragging={dragKey === doc.key}
+        isDragOver={dragOverKey === doc.key && dragKey !== null && dragKey !== doc.key}
         renameValue={renaming?.doc.key === doc.key ? renaming.value : ""}
         renameError={renaming?.doc.key === doc.key ? renameError : null}
         onRenameValueChange={(value) => setRenaming((prev) => (prev ? { ...prev, value } : prev))}
@@ -162,6 +221,13 @@ export function TabBar({ pinnedTabs, previewTab, activeKey, dirtyKeys, onActivat
         onClose={() => onClose(doc.key)}
         onPin={() => onPin(doc.key)}
         onUnpin={() => onUnpin(doc.key)}
+        onDragStart={() => setDragKey(doc.key)}
+        onDragOver={() => setDragOverKey(doc.key)}
+        onDrop={() => {
+          if (dragKey && dragKey !== doc.key) onReorder(dragKey, doc.key);
+          endDrag();
+        }}
+        onDragEnd={endDrag}
       />
     );
   }

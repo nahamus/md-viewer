@@ -275,6 +275,7 @@ function App() {
             onClose={requestCloseTab}
             onPin={state.pinTab}
             onUnpin={state.unpinTab}
+            onReorder={state.reorderPinnedTab}
             onRename={state.renameDoc}
           />
 

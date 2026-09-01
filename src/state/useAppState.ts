@@ -531,6 +531,20 @@ export function useAppState() {
     [pinnedTabs, docs],
   );
 
+  /** Moves the pinned tab `fromKey` to sit where `toKey` currently is, preserving the rest of the order. */
+  const reorderPinnedTab = useCallback((fromKey: string, toKey: string) => {
+    if (fromKey === toKey) return;
+    setPinnedTabs((prev) => {
+      const fromIdx = prev.findIndex((t) => t.key === fromKey);
+      const toIdx = prev.findIndex((t) => t.key === toKey);
+      if (fromIdx === -1 || toIdx === -1) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
+  }, []);
+
   const pinTab = useCallback(
     (key: string) => {
       if (previewTab?.key !== key) return;
@@ -682,6 +696,7 @@ export function useAppState() {
     openDoc,
     pinTab,
     unpinTab,
+    reorderPinnedTab,
     closeTab,
     setMode,
     setDraft,
