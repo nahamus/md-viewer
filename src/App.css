@@ -1299,13 +1299,11 @@ textarea:focus-visible {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* A wide table scrolls within the column instead of forcing the whole
-   document pane to scroll sideways. */
+/* Wide tables wrap their cell text to fit the column rather than scrolling
+   sideways — a tall table's horizontal scrollbar would otherwise sit far
+   below the fold, out of reach until you scroll to the bottom. */
 .markdown-body table {
-  display: block;
-  width: max-content;
   max-width: 100%;
-  overflow-x: auto;
   border-collapse: collapse;
 }
 
@@ -1313,6 +1311,7 @@ textarea:focus-visible {
 .markdown-body td {
   border: 1px solid var(--border);
   padding: 6px 10px;
+  overflow-wrap: break-word;
 }
 
 .markdown-body thead th {
