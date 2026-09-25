@@ -211,7 +211,6 @@ export function Sidebar({
                   </div>
                 )}
               </div>
-              {path && <div className="tree-source-path">{path}</div>}
               {status === "connecting" && <div className="tree-source-path source-status-connecting">Connecting…</div>}
               {status === "disconnected" && (
                 <div className="tree-source-path source-status">
