@@ -4,7 +4,7 @@ import type { HeadingItem } from "../lib/headings";
 
 interface Props {
   headings: HeadingItem[];
-  onJump: (id: string) => void;
+  onJump: (heading: HeadingItem) => void;
 }
 
 export function OutlinePanel({ headings, onJump }: Props) {
@@ -37,7 +37,7 @@ export function OutlinePanel({ headings, onJump }: Props) {
               style={{ paddingLeft: `${(h.level - minLevel) * 14 + 10}px` }}
               title={h.text}
               onClick={() => {
-                onJump(h.id);
+                onJump(h);
                 setOpen(false);
               }}
             >

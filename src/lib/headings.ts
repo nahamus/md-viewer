@@ -2,6 +2,8 @@ export interface HeadingItem {
   level: number;
   text: string;
   id: string;
+  /** 0-indexed line within the source this heading appears on. */
+  line: number;
 }
 
 function stripInlineMarkdown(text: string): string {
@@ -48,13 +50,13 @@ export function extractHeadings(content: string): HeadingItem[] {
   let fence: { char: string; len: number } | null = null;
   let previousLine: string | null = null;
 
-  function addHeading(level: number, rawText: string) {
+  function addHeading(level: number, rawText: string, line: number) {
     const text = stripInlineMarkdown(rawText);
     if (!text) return;
     const baseId = slugify(text) || "section";
     const count = seen.get(baseId) ?? 0;
     seen.set(baseId, count + 1);
-    headings.push({ level, text, id: count === 0 ? baseId : `${baseId}-${count}` });
+    headings.push({ level, text, id: count === 0 ? baseId : `${baseId}-${count}`, line });
   }
 
   const lines = content.split("\n");
@@ -88,14 +90,14 @@ export function extractHeadings(content: string): HeadingItem[] {
 
     const atx = ATX_RE.exec(line);
     if (atx) {
-      addHeading(atx[1].length, atx[2] ?? "");
+      addHeading(atx[1].length, atx[2] ?? "", i);
       previousLine = null;
       continue;
     }
 
     const setext = SETEXT_RE.exec(line);
     if (setext && previousLine !== null && previousLine.trim() !== "") {
-      addHeading(setext[1][0] === "=" ? 1 : 2, previousLine);
+      addHeading(setext[1][0] === "=" ? 1 : 2, previousLine, i - 1);
       previousLine = null;
       continue;
     }

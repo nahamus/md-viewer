@@ -1,14 +1,14 @@
-import { isValidElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isValidElement, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
-import { extractHeadings } from "../lib/headings";
+import { extractHeadings, type HeadingItem } from "../lib/headings";
 import { isAbsoluteUrl, resolveRelativePath } from "../lib/folderSource";
 import { modKeyLabel } from "../lib/platform";
 import { docKey, type DocMode, type DocUiState, type FileOpResult, type OpenDoc } from "../types";
 import { CodeBlock } from "./CodeBlock";
 import { EditIcon } from "./EditIcon";
-import { EditorView } from "./EditorView";
+import { EditorView, type EditorViewHandle } from "./EditorView";
 import { MarkdownImage } from "./MarkdownImage";
 import { Mermaid } from "./Mermaid";
 import { OutlinePanel } from "./OutlinePanel";
@@ -78,8 +78,19 @@ export function DocumentPane({
     setRefreshError(null);
   }
 
-  const headings = useMemo(() => extractHeadings(content), [content]);
+  // While editing, the outline should reflect what's actually being typed
+  // (e.g. a heading just added), not the last-saved content.
+  const headings = useMemo(() => extractHeadings(isEditing ? ui.draft : content), [isEditing, ui.draft, content]);
   const contentRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<EditorViewHandle>(null);
+  // The outer scrollable pane (View mode scrolls here; in Edit mode the
+  // textarea scrolls internally instead — see EditorView's own onScroll).
+  const contentAreaRef = useRef<HTMLDivElement>(null);
+  // Always holds the most recently observed scroll fraction (0..1) from
+  // whichever mode is currently active, so switching Edit<->View — however
+  // it's triggered (toolbar click, Ctrl/Cmd+S, Escape) — can restore roughly
+  // the same place instead of jumping back to the top.
+  const scrollFractionRef = useRef(0);
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -113,8 +124,27 @@ export function DocumentPane({
     [doc.sourceId, doc.relPath, onResolveAsset],
   );
 
-  function jumpToHeading(id: string) {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  // Runs synchronously after Edit<->View swaps which DOM is mounted, before
+  // paint — restores the fraction captured (via onScroll, continuously) from
+  // whichever mode was just left. Deliberately keyed on mode alone, not
+  // doc.key: switching tabs without changing mode shouldn't touch scroll.
+  useLayoutEffect(() => {
+    const fraction = scrollFractionRef.current;
+    if (isEditing) {
+      editorRef.current?.scrollToFraction(fraction);
+    } else {
+      const el = contentAreaRef.current;
+      if (el) el.scrollTop = fraction * (el.scrollHeight - el.clientHeight);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing]);
+
+  function jumpToHeading(heading: HeadingItem) {
+    if (isEditing) {
+      editorRef.current?.scrollToLine(heading.line);
+    } else {
+      document.getElementById(heading.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
   const markdownComponents = useMemo<Components>(
@@ -199,6 +229,7 @@ export function DocumentPane({
         <div className="document-toolbar-actions">
           {isEditing ? (
             <>
+              <OutlinePanel headings={headings} onJump={jumpToHeading} />
               <button
                 type="button"
                 className={`icon-action-btn ${dirty ? "icon-action-btn--active" : ""}`}
@@ -249,7 +280,16 @@ export function DocumentPane({
         </div>
       </div>
 
-      <div className="document-content">
+      <div
+        className="document-content"
+        ref={contentAreaRef}
+        onScroll={(e) => {
+          if (isEditing) return;
+          const el = e.currentTarget;
+          const max = el.scrollHeight - el.clientHeight;
+          scrollFractionRef.current = max > 0 ? el.scrollTop / max : 0;
+        }}
+      >
         {ui.error && <p className="form-error">{ui.error}</p>}
         {refreshError && <p className="form-error">{refreshError}</p>}
         {ui.mode === "view" && (
@@ -259,7 +299,16 @@ export function DocumentPane({
             </ReactMarkdown>
           </div>
         )}
-        {ui.mode === "edit" && <EditorView value={ui.draft} onChange={onDraftChange} />}
+        {ui.mode === "edit" && (
+          <EditorView
+            ref={editorRef}
+            value={ui.draft}
+            onChange={onDraftChange}
+            onScrollFractionChange={(fraction) => {
+              scrollFractionRef.current = fraction;
+            }}
+          />
+        )}
       </div>
     </div>
   );
