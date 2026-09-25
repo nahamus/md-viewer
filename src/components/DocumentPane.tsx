@@ -1,5 +1,6 @@
 import { isValidElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { extractHeadings } from "../lib/headings";
 import { isAbsoluteUrl, resolveRelativePath } from "../lib/folderSource";
@@ -253,7 +254,7 @@ export function DocumentPane({
         {refreshError && <p className="form-error">{refreshError}</p>}
         {ui.mode === "view" && (
           <div className="markdown-body" ref={contentRef}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={markdownComponents}>
               {content}
             </ReactMarkdown>
           </div>
