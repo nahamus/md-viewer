@@ -2,8 +2,9 @@ import { isValidElement, useCallback, useEffect, useMemo, useRef, useState } fro
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { extractHeadings } from "../lib/headings";
+import { isAbsoluteUrl, resolveRelativePath } from "../lib/folderSource";
 import { modKeyLabel } from "../lib/platform";
-import type { DocMode, DocUiState, FileOpResult, OpenDoc } from "../types";
+import { docKey, type DocMode, type DocUiState, type FileOpResult, type OpenDoc } from "../types";
 import { CodeBlock } from "./CodeBlock";
 import { EditIcon } from "./EditIcon";
 import { EditorView } from "./EditorView";
@@ -28,12 +29,23 @@ interface Props {
    * folder-source doc — it has no directory context for asset resolution,
    * which is what isFolderDoc otherwise gates. */
   showRefresh: boolean;
+  /** Every known doc's key -> content, used to tell whether a relative markdown
+   * link's target actually exists (for both virtual and folder sources). */
+  docs: Record<string, string>;
+  /** The doc's source's manually-entered path label (see Source.path), if any —
+   * browsers never expose a real filesystem path for a picked folder, so this is
+   * a user-provided annotation shown as a toolbar tooltip, not a verified path. */
+  sourcePathLabel?: string;
   onSetMode: (mode: DocMode) => void;
   onDraftChange: (value: string) => void;
   onSave: () => void;
   onCancel: () => void;
   onResolveAsset: (sourceId: string, fromRelPath: string, assetPath: string) => Promise<string | null>;
   onRefresh: () => Promise<FileOpResult>;
+  /** A relative markdown link to another doc in the same source was clicked.
+   * `pin: true` (Ctrl/Cmd-click or middle-click) opens it as a new persistent
+   * tab; otherwise it reuses the preview tab, mirroring the sidebar. */
+  onOpenDocLink: (sourceId: string, relPath: string, opts: { pin: boolean }) => void;
 }
 
 export function DocumentPane({
@@ -42,12 +54,15 @@ export function DocumentPane({
   ui,
   isFolderDoc,
   showRefresh,
+  docs,
+  sourcePathLabel,
   onSetMode,
   onDraftChange,
   onSave,
   onCancel,
   onResolveAsset,
   onRefresh,
+  onOpenDocLink,
 }: Props) {
   const isEditing = ui.mode === "edit";
   const dirty = isEditing && ui.draft !== content;
@@ -122,14 +137,61 @@ export function DocumentPane({
       img({ src, alt }) {
         return <MarkdownImage src={src ?? ""} alt={alt} resolveAsset={isFolderDoc ? resolveAsset : undefined} />;
       },
+      a({ href, children }) {
+        if (!href || href.startsWith("#") || isAbsoluteUrl(href)) {
+          const external = !!href && !href.startsWith("#") && isAbsoluteUrl(href);
+          return (
+            <a href={href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined}>
+              {children}
+            </a>
+          );
+        }
+
+        // remark-rehype percent-encodes link URLs (e.g. spaces -> %20) when
+        // converting to hast, so `href` here won't match a relPath containing
+        // those characters unless it's decoded back first.
+        let rawTarget = href.split("#")[0];
+        try {
+          rawTarget = decodeURIComponent(rawTarget);
+        } catch {
+          // Malformed escape (e.g. a literal `%` in the filename) — use as-is.
+        }
+        const targetPath = resolveRelativePath(doc.relPath, rawTarget);
+        const exists = docKey(doc.sourceId, targetPath) in docs;
+
+        if (!exists) {
+          return (
+            <a href={href} className="markdown-link-broken" title="Not found in this source" onClick={(e) => e.preventDefault()}>
+              {children}
+            </a>
+          );
+        }
+
+        return (
+          <a
+            href={href}
+            onClick={(e) => {
+              e.preventDefault();
+              onOpenDocLink(doc.sourceId, targetPath, { pin: e.metaKey || e.ctrlKey });
+            }}
+            onAuxClick={(e) => {
+              if (e.button !== 1) return;
+              e.preventDefault();
+              onOpenDocLink(doc.sourceId, targetPath, { pin: true });
+            }}
+          >
+            {children}
+          </a>
+        );
+      },
     }),
-    [isFolderDoc, resolveAsset],
+    [isFolderDoc, resolveAsset, doc.sourceId, doc.relPath, docs, onOpenDocLink],
   );
 
   return (
     <div className="document-pane">
       <div className="document-toolbar">
-        <span className="document-path">
+        <span className="document-path" title={sourcePathLabel ? `${sourcePathLabel}/${doc.relPath}` : undefined}>
           {doc.sourceName} / {doc.relPath}
           {dirty ? " •" : ""}
         </span>

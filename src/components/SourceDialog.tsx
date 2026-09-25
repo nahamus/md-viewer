@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useEscapeKey } from "../hooks/useEscapeKey";
 import { isBraveBrowser } from "../lib/folderSource";
-import { displayPath, type FileOpResult, type FolderStatus, type Source } from "../types";
+import { displayPath, type AddFolderResult, type FileOpResult, type FolderStatus, type Source } from "../types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { DeleteIcon } from "./DeleteIcon";
 import { EditIcon } from "./EditIcon";
@@ -11,7 +11,7 @@ interface Props {
   folderSourcesSupported: boolean;
   folderStatus: Record<string, FolderStatus>;
   onAdd: (name: string, path?: string) => FileOpResult;
-  onAddFolder: () => Promise<FileOpResult>;
+  onAddFolder: () => Promise<AddFolderResult>;
   onUpdate: (id: string, updates: { name: string; path?: string }) => void;
   onRemove: (id: string) => void;
   onReconnect: (id: string) => Promise<FileOpResult>;
@@ -64,7 +64,14 @@ export function SourceDialog({
     setAddingFolder(true);
     const result = await onAddFolder();
     setAddingFolder(false);
-    if (!result.ok) setFolderError(result.error);
+    if (!result.ok) {
+      setFolderError(result.error);
+      return;
+    }
+    // Browsers never expose a folder's real filesystem path (only its own
+    // name) — drop straight into the path-label field so it can be entered
+    // by hand while the folder just picked is still top of mind.
+    if (result.source) startEdit(result.source);
   }
 
   async function handleReconnect(id: string) {
@@ -119,16 +126,16 @@ export function SourceDialog({
                           }
                         }}
                       >
+                        <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Name" />
                         <input
                           autoFocus
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          placeholder="Name"
-                        />
-                        <input
                           value={editPath}
                           onChange={(e) => setEditPath(e.target.value)}
-                          placeholder="Path (optional)"
+                          placeholder={
+                            source.kind === "folder"
+                              ? "Full path on disk (optional, e.g. C:\\Users\\you\\Notes)"
+                              : "Path (optional)"
+                          }
                         />
                         <div className="inline-edit-actions">
                           <button type="submit" className="icon-btn" title="Save">

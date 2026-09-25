@@ -70,6 +70,10 @@ export interface DocUiState {
 /** Outcome of a rename/delete request against a doc source. */
 export type FileOpResult = { ok: true } | { ok: false; error: string };
 
+/** Result of adding a folder source: `source` is present only when a new
+ * source was actually created (absent if the user cancelled the picker). */
+export type AddFolderResult = { ok: true; source?: Source } | { ok: false; error: string };
+
 /** The sidebar/tabs layout, persisted per-profile so it survives reloads. */
 export interface SessionState {
   pinnedTabs: OpenDoc[];

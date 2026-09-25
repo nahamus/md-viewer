@@ -14,7 +14,7 @@ import { useApplyTheme } from "./hooks/useTheme";
 import { useLaunchedFile } from "./hooks/useLaunchedFile";
 import { modKeyLabel } from "./lib/platform";
 import { useAppState } from "./state/useAppState";
-import type { UserProfile } from "./types";
+import { displayPath, type UserProfile } from "./types";
 
 interface ConfirmRequest {
   title: string;
@@ -34,6 +34,16 @@ function App() {
   const launched = useLaunchedFile();
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [profileDialog, setProfileDialog] = useState<ProfileDialogState>(null);
+
+  // A relative markdown link (e.g. `[x](./other.md)`) was clicked in a
+  // rendered document — resolve it against this app's own sources/tabs
+  // rather than letting the browser try to navigate there.
+  function openDocLink(sourceId: string, relPath: string, opts: { pin: boolean }) {
+    const source = state.sources.find((s) => s.id === sourceId);
+    if (!source) return;
+    const name = relPath.split("/").pop() ?? relPath;
+    runAfterClosingLaunchedFile(() => state.openDoc(source, relPath, name, opts));
+  }
 
   // A file opened from the OS (see useLaunchedFile) takes over the main pane
   // until closed — switching to a sidebar/tab/search doc implicitly closes
@@ -124,9 +134,9 @@ function App() {
 
   const { activeDoc } = state;
   const activeContent = activeDoc ? (docs[activeDoc.key] ?? "") : "";
-  const isFolderDoc = activeDoc
-    ? state.sources.find((s) => s.id === activeDoc.sourceId)?.kind === "folder"
-    : false;
+  const activeSource = activeDoc ? state.sources.find((s) => s.id === activeDoc.sourceId) : undefined;
+  const isFolderDoc = activeSource?.kind === "folder";
+  const sourcePathLabel = activeSource ? displayPath(activeSource) : undefined;
   // Tabs restored from a previous session never went through openDoc(), so
   // they may not have a docsUi entry yet — fall back to a plain view state
   // rather than showing the empty-state placeholder for an open tab.
@@ -305,6 +315,7 @@ function App() {
                 }}
                 isFolderDoc={false}
                 showRefresh
+                docs={docs}
                 onSetMode={launched.setMode}
                 onDraftChange={launched.setDraft}
                 onSave={launched.save}
@@ -314,6 +325,7 @@ function App() {
                   await launched.refresh();
                   return { ok: true } as const;
                 }}
+                onOpenDocLink={openDocLink}
               />
             </>
           ) : activeDoc && activeDocUi ? (
@@ -323,12 +335,15 @@ function App() {
               ui={activeDocUi}
               isFolderDoc={isFolderDoc}
               showRefresh={isFolderDoc}
+              docs={docs}
+              sourcePathLabel={sourcePathLabel}
               onSetMode={(mode) => state.setMode(activeDoc.key, mode)}
               onDraftChange={(value) => state.setDraft(activeDoc.key, value)}
               onSave={() => state.saveDoc(activeDoc)}
               onCancel={() => requestCancelEdit(activeDoc.key)}
               onResolveAsset={state.resolveFolderAsset}
               onRefresh={() => state.refreshDoc(activeDoc.sourceId, activeDoc.relPath)}
+              onOpenDocLink={openDocLink}
             />
           ) : (
             <div className="empty-state">

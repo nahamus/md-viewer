@@ -4,6 +4,7 @@ import * as handles from "../storage/handles";
 import * as storage from "../storage/store";
 import {
   docKey,
+  type AddFolderResult,
   type DocMode,
   type DocUiState,
   type FileOpResult,
@@ -133,7 +134,7 @@ export function useAppState() {
     };
   }, [currentUserId, loadFolderContents]);
 
-  const addFolderSource = useCallback(async (): Promise<FileOpResult> => {
+  const addFolderSource = useCallback(async (): Promise<AddFolderResult> => {
     if (!folderSource.folderSourcesSupported) {
       const error = folderSource.isBraveBrowser
         ? "Enable brave://flags/#file-system-access-api and relaunch Brave, or add a virtual source instead."
@@ -171,7 +172,7 @@ export function useAppState() {
       return { ok: false, error: `Folder added, but couldn't read its contents: ${(err as Error).message}` };
     }
     setFolderStatus((prev) => ({ ...prev, [source.id]: "connected" }));
-    return { ok: true };
+    return { ok: true, source };
   }, [currentUserId, refreshUserData, loadFolderContents, userData.sources, folderHandles]);
 
   const reconnectFolderSource = useCallback(
